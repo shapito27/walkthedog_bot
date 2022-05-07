@@ -1,0 +1,11 @@
+development:
+  api_token: ""
+  timeout: 60
+
+test:
+  api_token: ""
+  timeout: 60
+
+production:
+  api_token: ""
+  timeout: 60
