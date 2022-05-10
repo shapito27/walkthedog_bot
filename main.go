@@ -32,6 +32,16 @@ type Shelter struct {
 	Link  string `yaml:"link"`
 }
 
+type TripToShelter struct {
+	Username string
+	Shelter *Shelter
+	Date string
+	IsFirstTrip bool
+	UserPurpose string
+	TripBy string
+	HowYouKnowAboutUs string
+}
+
 func main() {
 	// getting config by environment
 	env := developmentEnv
@@ -59,6 +69,10 @@ func main() {
 	updates := bot.GetUpdatesChan(u)
 
 	var lastMessage string
+	shelters, err := getShelters()
+	if err != nil {
+		log.Panic(err)
+	}
 	// getting message
 	for update := range updates {
 		if update.Message != nil { // If we got a message
@@ -74,12 +88,12 @@ func main() {
 				lastMessage = "/start"
 			case "/go_shelter":
 				log.Println("[walkthedog_bot]: Send whichShelter question")
-				msgObj = whichShelter(update.Message.Chat.ID)
+				msgObj = whichShelter(update.Message.Chat.ID, shelters)
 				bot.Send(msgObj)
-				lastMessage = "/choose_shelter"
+				lastMessage = "/go_shelter"
 			case "/choose_shelter":
 				log.Println("[walkthedog_bot]: Send whichShelter question")
-				msgObj = whichShelter(update.Message.Chat.ID)
+				msgObj = whichShelter(update.Message.Chat.ID, shelters)
 				bot.Send(msgObj)
 				lastMessage = "/choose_shelter"
 			case "/masterclass":
@@ -164,7 +178,8 @@ func masterclass(chatId int64) tgbotapi.MessageConfig {
 // donation return message with options.
 func donation(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
-	message := `TODO donation message`
+	message := `Пожертвовать можно в:
+	1. Хаски Хелп (Истра) https://www.tinkoff.ru/sl/1msxKU5XTyS`
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	return msgObj
@@ -182,14 +197,10 @@ func startMessage(chatId int64) tgbotapi.MessageConfig {
 }
 
 // whichShelter return message with question "Which Shelter you want go" and button options.
-func whichShelter(chatId int64) tgbotapi.MessageConfig {
+func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
 	message := "В какой приют желаете записаться?"
 	msgObj := tgbotapi.NewMessage(chatId, message)
-	shelters, err := getShelters()
-	if err != nil {
-		log.Panic(err)
-	}
 
 	var sheltersButtons [][]tgbotapi.KeyboardButton
 	for _, v := range *shelters {
