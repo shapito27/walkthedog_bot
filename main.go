@@ -28,17 +28,18 @@ type TelegramConfig struct {
 type SheltersList map[int]Shelter
 
 type Shelter struct {
-	Title string `yaml:"title"`
-	Link  string `yaml:"link"`
+	Title      string `yaml:"title"`
+	Link       string `yaml:"link"`
+	DonateLink string `yaml:"donate_link"`
 }
 
 type TripToShelter struct {
-	Username string
-	Shelter *Shelter
-	Date string
-	IsFirstTrip bool
-	UserPurpose string
-	TripBy string
+	Username          string
+	Shelter           *Shelter
+	Date              string
+	IsFirstTrip       bool
+	UserPurpose       string
+	TripBy            string
 	HowYouKnowAboutUs string
 }
 
@@ -96,6 +97,11 @@ func main() {
 				msgObj = whichShelter(update.Message.Chat.ID, shelters)
 				bot.Send(msgObj)
 				lastMessage = "/choose_shelter"
+			case "/trip_dates":
+				log.Println("[walkthedog_bot]: Send whichDate question")
+				msgObj = whichDate(update.Message.Chat.ID)
+				bot.Send(msgObj)
+				lastMessage = "/trip_dates"
 			case "/masterclass":
 				log.Println("[walkthedog_bot]: Send masterclass")
 				msgObj = masterclass(update.Message.Chat.ID)
@@ -103,32 +109,34 @@ func main() {
 				lastMessage = "/masterclass"
 			case "/donation":
 				log.Println("[walkthedog_bot]: Send donation")
-				msgObj = donation(update.Message.Chat.ID)
+				msgObj = donation(update.Message.Chat.ID, shelters)
 				bot.Send(msgObj)
 				lastMessage = "/donation"
+			default:
+				switch lastMessage {
+				// when shelter was chosen next step to chose date
+				case "/choose_shelter":
+					if update.Message.Text == "Хаски Хелп (Истра)" || update.Message.Text == "Приют \"Ника\" (Зеленоград)" {
+						shelter := update.Message.Text
+						message := `Хороший выбор!
+%s будет рад вам.
+Адрес: Московская область, городской округ Истра, деревня Карцево.
+О приюте: https://walkthedog.ru/huskyhelp`
+						msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf(message, shelter))
+						bot.Send(msgObj)
+
+						log.Println("[walkthedog_bot]: Send whichDate question")
+						msgObj = whichDate(update.Message.Chat.ID)
+						bot.Send(msgObj)
+						lastMessage = "/choose_date"
+					}
+				}
 			}
-
-			log.Println("lastMessage", lastMessage, "shelter_name", update.Message.Text == "Хаски Хелп (Истра)")
-			var shelter string
-			if lastMessage == "/choose_shelter" && (update.Message.Text == "Хаски Хелп (Истра)" || update.Message.Text == "Приют \"Ника\" (Зеленоград)") {
-				shelter = update.Message.Text
-
-				message := "Хороший выбор!\n%s будет рад вам.\nАдрес: Московская область, городской округ Истра, деревня Карцево.\nО приюте: https://walkthedog.ru/huskyhelp"
-				msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf(message, shelter))
-				bot.Send(msgObj)
-
-				log.Println("[walkthedog_bot]: Send whichDate question")
-				msgObj = whichDate(update.Message.Chat.ID)
-				bot.Send(msgObj)
-				lastMessage = "/choose_date"
-			}
-
-			//lastMessage = update.Message.Text
 		}
 	}
 }
 
-// getConfig return config by environment.
+// getConfig returns config by environment.
 func getConfig(environment string) (*TelegramConfig, error) {
 	yamlFile, err := ioutil.ReadFile("configs/telegram.yml")
 	if err != nil {
@@ -149,7 +157,7 @@ func getConfig(environment string) (*TelegramConfig, error) {
 	return environmentConfig[environment], nil
 }
 
-// getShelters return list of shelters with information about them.
+// getShelters returns list of shelters with information about them.
 func getShelters() (*SheltersList, error) {
 	yamlFile, err := ioutil.ReadFile("configs/shelters.yml")
 	if err != nil {
@@ -166,7 +174,7 @@ func getShelters() (*SheltersList, error) {
 	return &sheltersList, nil
 }
 
-// masterclass return message with options.
+// masterclass returns masterclasses.
 func masterclass(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
 	message := `TODO masterclass message`
@@ -175,17 +183,22 @@ func masterclass(chatId int64) tgbotapi.MessageConfig {
 	return msgObj
 }
 
-// donation return message with options.
-func donation(chatId int64) tgbotapi.MessageConfig {
-	//ask about what shelter are you going
-	message := `Пожертвовать можно в:
-	1. Хаски Хелп (Истра) https://www.tinkoff.ru/sl/1msxKU5XTyS`
+// donation returns information about donations.
+func donation(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
+	message := "Пожертвовать можно в:\n"
+	for i, shelter := range *shelters {
+		if len(shelter.DonateLink) == 0 {
+			continue
+		}
+		message += fmt.Sprintf("%d. %s\n %s\n", i, shelter.Title, shelter.DonateLink)
+	}
 	msgObj := tgbotapi.NewMessage(chatId, message)
+	msgObj.DisableWebPagePreview = true
 
 	return msgObj
 }
 
-// startMessage return message with options.
+// startMessage returns first message with all available commands.
 func startMessage(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
 	message := `- /go_shelter Записаться на выезд в приют
@@ -196,7 +209,7 @@ func startMessage(chatId int64) tgbotapi.MessageConfig {
 	return msgObj
 }
 
-// whichShelter return message with question "Which Shelter you want go" and button options.
+// whichShelter returns message with question "Which Shelter you want go" and button options.
 func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
 	message := "В какой приют желаете записаться?"
@@ -216,7 +229,7 @@ func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 	return msgObj
 }
 
-// whichDate return message with question "Which Date you want go" and button options
+// whichDate returns message with question "Which Date you want go" and button options
 func whichDate(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
 	message := "Выберите дату выезда"
@@ -245,7 +258,7 @@ func whichDate(chatId int64) tgbotapi.MessageConfig {
 	return msgObj
 }
 
-// FirstMonday returns the day of the first Monday in the given month.
+// calculateDay returns the day of the first Monday in the given month.
 func calculateDay(dayOfWeek int, week int, month time.Month) int {
 	t := time.Date(time.Now().Year(), month, 1, 0, 0, 0, 0, time.UTC)
 	return (8-int(t.Weekday()))%7 + (week-1)*7 + dayOfWeek
