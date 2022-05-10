@@ -18,9 +18,9 @@ const (
 	developmentEnv = "development"
 )
 
-type EnvironmentConfig map[string]*Config
+type EnvironmentConfig map[string]*TelegramConfig
 
-type Config struct {
+type TelegramConfig struct {
 	APIToken string `yaml:"api_token"`
 	Timeout  int    `yaml:"timeout"`
 }
@@ -68,10 +68,30 @@ func main() {
 			//check for commands
 			switch update.Message.Text {
 			case "/start":
+				log.Println("[walkthedog_bot]: Send start message")
+				msgObj = startMessage(update.Message.Chat.ID)
+				bot.Send(msgObj)
+				lastMessage = "/start"
+			case "/go_shelter":
 				log.Println("[walkthedog_bot]: Send whichShelter question")
 				msgObj = whichShelter(update.Message.Chat.ID)
 				bot.Send(msgObj)
 				lastMessage = "/choose_shelter"
+			case "/choose_shelter":
+				log.Println("[walkthedog_bot]: Send whichShelter question")
+				msgObj = whichShelter(update.Message.Chat.ID)
+				bot.Send(msgObj)
+				lastMessage = "/choose_shelter"
+			case "/masterclass":
+				log.Println("[walkthedog_bot]: Send masterclass")
+				msgObj = masterclass(update.Message.Chat.ID)
+				bot.Send(msgObj)
+				lastMessage = "/masterclass"
+			case "/donation":
+				log.Println("[walkthedog_bot]: Send donation")
+				msgObj = donation(update.Message.Chat.ID)
+				bot.Send(msgObj)
+				lastMessage = "/donation"
 			}
 
 			log.Println("lastMessage", lastMessage, "shelter_name", update.Message.Text == "Хаски Хелп (Истра)")
@@ -95,8 +115,8 @@ func main() {
 }
 
 // getConfig return config by environment.
-func getConfig(environment string) (*Config, error) {
-	yamlFile, err := ioutil.ReadFile("telegram.yml")
+func getConfig(environment string) (*TelegramConfig, error) {
+	yamlFile, err := ioutil.ReadFile("configs/telegram.yml")
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +137,7 @@ func getConfig(environment string) (*Config, error) {
 
 // getShelters return list of shelters with information about them.
 func getShelters() (*SheltersList, error) {
-	yamlFile, err := ioutil.ReadFile("shelters.yml")
+	yamlFile, err := ioutil.ReadFile("configs/shelters.yml")
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +150,35 @@ func getShelters() (*SheltersList, error) {
 	log.Println("sheltersList", sheltersList)
 
 	return &sheltersList, nil
+}
+
+// masterclass return message with options.
+func masterclass(chatId int64) tgbotapi.MessageConfig {
+	//ask about what shelter are you going
+	message := `TODO masterclass message`
+	msgObj := tgbotapi.NewMessage(chatId, message)
+
+	return msgObj
+}
+
+// donation return message with options.
+func donation(chatId int64) tgbotapi.MessageConfig {
+	//ask about what shelter are you going
+	message := `TODO donation message`
+	msgObj := tgbotapi.NewMessage(chatId, message)
+
+	return msgObj
+}
+
+// startMessage return message with options.
+func startMessage(chatId int64) tgbotapi.MessageConfig {
+	//ask about what shelter are you going
+	message := `- /go_shelter Записаться на выезд в приют
+- /masterclass Записаться на мастерклас
+- /donation Сделать пожертвование`
+	msgObj := tgbotapi.NewMessage(chatId, message)
+
+	return msgObj
 }
 
 // whichShelter return message with question "Which Shelter you want go" and button options.
