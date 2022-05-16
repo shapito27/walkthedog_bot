@@ -52,7 +52,7 @@ type TelegramConfig struct {
 	Timeout  int    `yaml:"timeout"`
 }
 
-type SheltersList map[int]Shelter
+type SheltersList map[int]*Shelter
 
 type ShelterSchedule struct {
 	Type      string `yaml:"type"`
@@ -135,14 +135,8 @@ func main() {
 				lastMessage = "/start"
 			case "/go_shelter":
 				log.Println("[walkthedog_bot]: Send appointmentOptionsMessage message")
-				msgObj = appointmentOptionsMessage(update.Message.Chat.ID)
-				bot.Send(msgObj)
-				lastMessage = "/go_shelter"
+				lastMessage = goShelterCommand(bot, &update)
 			case "/choose_shelter":
-				//log.Println("[walkthedog_bot]: Send whichShelter question")
-				//msgObj = whichShelter(update.Message.Chat.ID, shelters)
-				//bot.Send(msgObj)
-				//lastMessage = "/choose_shelter"
 				lastMessage = chooseShelterCommand(bot, &update, newTripToShelter, &shelters)
 			case "/trip_dates":
 				lastMessage = tripDates(bot, &update, newTripToShelter, &shelters, lastMessage)
@@ -167,7 +161,9 @@ func main() {
 					} else if update.Message.Text == "Время" {
 						lastMessage = tripDates(bot, &update, newTripToShelter, &shelters, lastMessage)
 					} else {
-						Error(bot, &update, newTripToShelter, "Нажмите кноку Приют или Время")
+						Error(bot, &update, newTripToShelter, "Нажмите кноку \"Приют\" или \"Время\"")
+						lastMessage = goShelterCommand(bot, &update)
+						break
 					}
 				// when shelter was chosen next step to chose date
 				case "/choose_shelter":
@@ -179,17 +175,9 @@ func main() {
 					if err != nil {
 						Error(bot, &update, newTripToShelter, err.Error())
 						chooseShelterCommand(bot, &update, newTripToShelter, &shelters)
+						break
 					}
 					newTripToShelter.Shelter = shelter
-					//log.Println(shelter)
-					//newTripToShelter.Shelter = &shelter
-
-					//message := `Хороший выбор!
-					//%s будет рад вам.
-					//Адрес: %s.
-					//О приюте: %s`
-					//msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, fmt.Sprintf(message, shelter.Title, shelter.Address, shelter.Link))
-					//bot.Send(msgObj)
 
 					log.Println("[walkthedog_bot]: Send whichDate question")
 					msgObj = whichDate(update.Message.Chat.ID, shelter)
@@ -199,8 +187,14 @@ func main() {
 					lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
 				case "/is_first_trip":
 					lastMessage = tripPurposeCommand(bot, &update, newTripToShelter)
-					//case "/summary":
-					//	lastMessage = displayCommand(bot, &update, newTripToShelter)
+				default:
+					log.Println("[walkthedog_bot]: Unknown command")
+
+					message := "Не понимаю 🐶 Попробуй /start"
+					msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, message)
+					bot.Send(msgObj)
+					lastMessage = "/choose_date"
+
 				}
 			}
 		} else if update.Poll != nil {
@@ -211,24 +205,12 @@ func main() {
 			log.Printf("lastMessage: %s", lastMessage)
 			switch lastMessage {
 			case "/trip_purpose":
-				//log.Println("poll result: ", update.Poll.Options)
-				//for _, option := range update.Poll.Options {
-				//	if option.VoterCount != 0 {
-				//		newTripToShelter.Purpose = append(newTripToShelter.Purpose, option.Text)
-				//	}
-				//}
 				for _, option := range update.PollAnswer.OptionIDs {
 					newTripToShelter.Purpose = append(newTripToShelter.Purpose, purposes[option])
 				}
 
 				lastMessage = howYouKnowAboutUsCommand(bot, &update, newTripToShelter)
 			case "/how_you_know_about_us":
-				//for _, option := range update.Poll.Options {
-				//	if option.VoterCount != 0 {
-				//		newTripToShelter.HowYouKnowAboutUs = option.Text
-				//		break
-				//	}
-				//}
 				for _, option := range update.PollAnswer.OptionIDs {
 					newTripToShelter.HowYouKnowAboutUs = sources[option]
 					break
@@ -239,6 +221,12 @@ func main() {
 		}
 		log.Println("[trip_state]: ", newTripToShelter)
 	}
+}
+
+func goShelterCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update) string {
+	msgObj := appointmentOptionsMessage(update.Message.Chat.ID)
+	bot.Send(msgObj)
+	return "/go_shelter"
 }
 
 func chooseShelterCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *TripToShelter, shelters *SheltersList) string {
@@ -303,6 +291,7 @@ func tripDates(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *
 	if newTripToShelter == nil {
 		newTripToShelter = NewTripToShelter()
 		if lastMessage == "/choose_shelter" {
+			panic("change it if I use it")
 			shelter, err := shelters.getShelterByNameID(update.Message.Text)
 
 			if err != nil {
@@ -321,17 +310,24 @@ func tripDates(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *
 }
 
 func (shelters SheltersList) getShelterByNameID(name string) (*Shelter, error) {
-	shelterId, err := strconv.Atoi(name[0:strings.Index(name, ".")])
+	dotPosition := strings.Index(name, ".")
+	if dotPosition == -1 {
+		//log.Println(errors.New(fmt.Sprintf("message %s don't contain dot", name)))
+		return nil, errors.New("Не похоже на название приюта")
+	}
+	shelterId, err := strconv.Atoi(name[0:dotPosition])
 	if err != nil {
-		log.Panic(err)
+		log.Println(err)
+		return nil, errors.New("Не похоже на название приюта")
 	}
 	//log.Println("id part", update.Message.Text[0:strings.Index(update.Message.Text, ".")])
 	shelter, ok := shelters[shelterId]
 	if !ok {
-		return nil, errors.New(fmt.Sprintf("shelter name \"%s\", extracted id=\"%d\" is not found", name, shelterId))
+		log.Println(errors.New(fmt.Sprintf("shelter name \"%s\", extracted id=\"%d\" is not found", name, shelterId)))
+		return nil, errors.New("Не похоже на название приюта")
 	}
 
-	return &shelter, nil
+	return shelter, nil
 }
 
 func Error(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *TripToShelter, errMessage string) string {
@@ -377,8 +373,6 @@ func getShelters() (SheltersList, error) {
 		return nil, err
 	}
 
-	log.Println("sheltersList", sheltersList)
-
 	return sheltersList, nil
 }
 
@@ -394,14 +388,16 @@ func masterclass(chatId int64) tgbotapi.MessageConfig {
 // donationShelterList returns information about donations.
 func donationShelterList(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 	message := "Пожертвовать в приют:\n"
-	for i, shelter := range *shelters {
-		if len(shelter.DonateLink) == 0 {
+
+	for i := 1; i <= len(*shelters); i++ {
+		if len((*shelters)[i].DonateLink) == 0 {
 			continue
 		}
-		message += fmt.Sprintf("%d. %s\n %s\n", i, shelter.Title, shelter.DonateLink)
+		message += fmt.Sprintf("%s. %s\n %s\n", (*shelters)[i].ID, (*shelters)[i].Title, (*shelters)[i].DonateLink)
 	}
 	msgObj := tgbotapi.NewMessage(chatId, message)
 	msgObj.DisableWebPagePreview = true
+	msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 
 	return msgObj
 }
@@ -438,11 +434,13 @@ func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	var sheltersButtons [][]tgbotapi.KeyboardButton
-	for _, v := range *shelters {
+	log.Println("shelters before range", shelters)
+
+	for i := 1; i <= len(*shelters); i++ {
 		buttonRow := tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(fmt.Sprintf("%s. %s", v.ID, v.Title)),
+			tgbotapi.NewKeyboardButton(fmt.Sprintf("%s. %s", (*shelters)[i].ID, (*shelters)[i].Title)),
 		)
-		log.Println("v.Title", v.Title)
+
 		sheltersButtons = append(sheltersButtons, buttonRow)
 	}
 	log.Println("sheltersButtons", sheltersButtons)
@@ -472,19 +470,21 @@ func whichDate(chatId int64, shelter *Shelter) tgbotapi.MessageConfig {
 	fmt.Println(firstOfMonth)
 
 	var numericKeyboard tgbotapi.ReplyKeyboardMarkup
+	log.Println(shelter)
+	log.Println(*shelter)
+	log.Println(shelter.Schedule)
 
 	if shelter.Schedule.Type == "regularly" {
-		//if schedule["regularly"] != nil {
-		//fmt.Println("-----------what inside", schedule["regularly"])
+
 		scheduleWeek := shelter.Schedule.Details[0]
 		scheduleDay := shelter.Schedule.Details[1]
 		scheduleTime := shelter.Schedule.TimeStart
 		var dateButtons [][]tgbotapi.KeyboardButton
 		for i := 0; i < 6; i++ {
 			month := time.Month(int(time.Now().Month()) + i)
-			//@todo finish this function. Need to calculate first saturday, sunday for each month correctly
+
 			day := calculateDay(scheduleDay, scheduleWeek, month)
-			//log.Println(strconv.Itoa(day) + " " + strconv.Itoa(int(month)) + " суббота")
+			//TODO:display on russian lang
 			log.Println(day.Format("Mon 2 Jan") + " " + scheduleTime)
 			if i == 0 && time.Now().Day() > day.Day() {
 				continue
@@ -498,7 +498,7 @@ func whichDate(chatId int64, shelter *Shelter) tgbotapi.MessageConfig {
 		numericKeyboard = tgbotapi.NewReplyKeyboard(dateButtons...)
 		//}
 	} else if shelter.Schedule.Type == "everyday" {
-
+		//TODO: finish everyday type
 	}
 
 	msgObj.ReplyMarkup = numericKeyboard
@@ -558,6 +558,7 @@ func summary(chatId int64, newTripToShelter *TripToShelter) tgbotapi.MessageConf
 	return msgObj
 }
 
+// donation set donation text and message options and returns MessageConfig
 func donation(chatId int64) tgbotapi.MessageConfig {
 	message :=
 		`Добровольное пожертвование в 500 рублей и более осчастливит 1 собаку (500 рублей = 2 недели питания одной собаки в приюте). Все собранные деньги будут переданы в приют.
@@ -570,6 +571,7 @@ func donation(chatId int64) tgbotapi.MessageConfig {
 	msgObj := tgbotapi.NewMessage(chatId, message)
 	msgObj.ParseMode = tgbotapi.ModeHTML
 	msgObj.DisableWebPagePreview = true
+	msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 
 	return msgObj
 }
