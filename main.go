@@ -186,7 +186,15 @@ func main() {
 				case "/choose_date":
 					lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
 				case "/is_first_trip":
-					lastMessage = tripPurposeCommand(bot, &update, newTripToShelter)
+					lastMessage, err = tripPurposeCommand(bot, &update, newTripToShelter)
+					if err != nil {
+						Error(bot, &update, newTripToShelter, err.Error())
+						lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
+					}
+				case "/trip_purpose":
+					Error(bot, &update, newTripToShelter, "Выберите цели поездки и нажмите кнопку голосовать")
+				case "/how_you_know_about_us":
+					Error(bot, &update, newTripToShelter, "Расскажите как вы о нас узнали")
 				default:
 					log.Println("[walkthedog_bot]: Unknown command")
 
@@ -194,7 +202,6 @@ func main() {
 					msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, message)
 					bot.Send(msgObj)
 					lastMessage = "/choose_date"
-
 				}
 			}
 		} else if update.Poll != nil {
@@ -246,14 +253,13 @@ func isFirstTripCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 	return "/is_first_trip"
 }
 
-func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *TripToShelter) string {
+func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *TripToShelter) (string, error) {
 	if update.Message.Text == "Да" {
 		newTripToShelter.IsFirstTrip = true
 	} else if update.Message.Text == "Нет" {
 		newTripToShelter.IsFirstTrip = false
 	} else {
-		Error(bot, update, newTripToShelter, "Доступные ответы \"Да\" и \"Нет\"")
-		isFirstTripCommand(bot, update, newTripToShelter)
+		return "/is_first_trip", errors.New("Доступные ответы \"Да\" и \"Нет\"")
 	}
 
 	msgObj := tripPurpose(update.Message.Chat.ID)
@@ -261,7 +267,7 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 	responseMessage, _ := bot.Send(msgObj)
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
 
-	return "/trip_purpose"
+	return "/trip_purpose", nil
 }
 
 func howYouKnowAboutUsCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *TripToShelter) string {
@@ -490,7 +496,7 @@ func whichDate(chatId int64, shelter *Shelter) tgbotapi.MessageConfig {
 				continue
 			}
 			buttonRow := tgbotapi.NewKeyboardButtonRow(
-				tgbotapi.NewKeyboardButton(day.Format("Mon 2 Jan") + " " + scheduleTime),
+				tgbotapi.NewKeyboardButton(day.Format("Mon 02.01.2006") + " " + scheduleTime),
 			)
 			dateButtons = append(dateButtons, buttonRow)
 
