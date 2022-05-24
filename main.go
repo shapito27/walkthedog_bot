@@ -49,6 +49,13 @@ var sources = []string{
 // polls stores poll_id => chat_id
 var polls = make(map[string]int64)
 
+// State represents state of chat with user
+type State struct {
+	ChatId        int64
+	LastMessage   string
+	TripToShelter *TripToShelter
+}
+
 type EnvironmentConfig map[string]*TelegramConfig
 
 type TelegramConfig struct {
@@ -56,8 +63,10 @@ type TelegramConfig struct {
 	Timeout  int    `yaml:"timeout"`
 }
 
+// SheltersList represents list of Shelters
 type SheltersList map[int]*Shelter
 
+// ShelterSchedule represents trips shedule to shelters
 type ShelterSchedule struct {
 	Type      string `yaml:"type"`
 	Details   []int  `yaml:"details"`
@@ -65,6 +74,7 @@ type ShelterSchedule struct {
 	TimeEnd   string `yaml:"time_end"`
 }
 
+// Shelter represent shelter information
 type Shelter struct {
 	ID         string          `yaml:"id"`
 	Address    string          `yaml:"address"`
@@ -116,7 +126,11 @@ func main() {
 
 	updates := bot.GetUpdatesChan(u)
 
+	// statePool store all chat states
+	statePool := make(map[int64]*State)
 	var lastMessage string
+
+	// getting shelters
 	shelters, err := getShelters()
 	if err != nil {
 		log.Panic(err)
@@ -126,6 +140,28 @@ func main() {
 
 	// getting message
 	for update := range updates {
+		var chatId int64
+		// extract chat id for different cases
+		if update.Message != nil {
+			chatId = update.Message.Chat.ID
+		} else if update.PollAnswer != nil {
+			chatId = polls[update.PollAnswer.PollID]
+		}
+
+		// fetching state or init new
+		state, ok := statePool[chatId]
+		log.Printf("**state**: %+v", state)
+		if !ok {
+			state = &State{
+				ChatId:      chatId,
+				LastMessage: "",
+			}
+			statePool[chatId] = state
+		}
+		// initilize last message and trip to shelter
+		lastMessage = state.LastMessage
+		newTripToShelter = state.TripToShelter
+
 		if update.Message != nil { // If we got a message
 			log.Printf("[%s]: %s", update.Message.From.UserName, update.Message.Text)
 			log.Printf("lastMessage: %s", lastMessage)
@@ -135,7 +171,7 @@ func main() {
 			switch update.Message.Text {
 			case "/start":
 				log.Println("[walkthedog_bot]: Send start message")
-				msgObj = startMessage(update.Message.Chat.ID)
+				msgObj = startMessage(chatId)
 				msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				bot.Send(msgObj)
 				lastMessage = "/start"
@@ -148,15 +184,15 @@ func main() {
 				lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
 			case "/masterclass":
 				log.Println("[walkthedog_bot]: Send masterclass")
-				msgObj = masterclass(update.Message.Chat.ID)
+				msgObj = masterclass(chatId)
 				bot.Send(msgObj)
 				lastMessage = "/masterclass"
 			case "/donation":
 				log.Println("[walkthedog_bot]: Send donation")
-				lastMessage = donationCommand(bot, update.Message.Chat.ID)
+				lastMessage = donationCommand(bot, chatId)
 			case "/donation_shelter_list":
 				log.Println("[walkthedog_bot]: Send donationShelterList")
-				msgObj = donationShelterList(update.Message.Chat.ID, &shelters)
+				msgObj = donationShelterList(chatId, &shelters)
 				bot.Send(msgObj)
 				lastMessage = "/donation_shelter_list"
 			default:
@@ -186,7 +222,7 @@ func main() {
 					newTripToShelter.Shelter = shelter
 
 					log.Println("[walkthedog_bot]: Send whichDate question")
-					msgObj = whichDate(update.Message.Chat.ID, shelter)
+					msgObj = whichDate(chatId, shelter)
 					bot.Send(msgObj)
 					lastMessage = "/choose_date"
 				case "/choose_date":
@@ -205,7 +241,7 @@ func main() {
 					log.Println("[walkthedog_bot]: Unknown command")
 
 					message := "Не понимаю 🐶 Попробуй /start"
-					msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, message)
+					msgObj := tgbotapi.NewMessage(chatId, message)
 					bot.Send(msgObj)
 					lastMessage = "/choose_date"
 				}
@@ -216,6 +252,7 @@ func main() {
 		} else if update.PollAnswer != nil {
 			log.Printf("[%s]: %v", update.PollAnswer.User.UserName, update.PollAnswer.OptionIDs)
 			log.Printf("lastMessage: %s", lastMessage)
+
 			switch lastMessage {
 			case "/trip_purpose":
 				for _, option := range update.PollAnswer.OptionIDs {
@@ -232,6 +269,10 @@ func main() {
 				lastMessage = donationCommand(bot, polls[update.PollAnswer.PollID])
 			}
 		}
+		// save state to pool
+		state.LastMessage = lastMessage
+		state.TripToShelter = newTripToShelter
+		statePool[chatId] = state
 		log.Println("[trip_state]: ", newTripToShelter)
 	}
 }
@@ -285,14 +326,14 @@ func howYouKnowAboutUsCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, new
 	return "/how_you_know_about_us"
 }
 
-// howYouKnowAboutUsCommand prepares message with summary and then sends it and returns last command.
+// summaryCommand prepares message with summary and then sends it and returns last command.
 func summaryCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *TripToShelter) string {
 	msgObj := summary(polls[update.PollAnswer.PollID], newTripToShelter)
 	bot.Send(msgObj)
 	return "/summary"
 }
 
-// howYouKnowAboutUsCommand prepares message with availabele ways to dontate us or shelters and then sends it and returns last command.
+// donationCommand prepares message with availabele ways to dontate us or shelters and then sends it and returns last command.
 func donationCommand(bot *tgbotapi.BotAPI, chatId int64) string {
 	msgObj := donation(chatId)
 	bot.Send(msgObj)
