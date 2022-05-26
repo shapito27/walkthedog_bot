@@ -1,4 +1,5 @@
-package google
+// Package sheet helps to read/write Google sheets
+package sheet
 
 import (
 	"context"

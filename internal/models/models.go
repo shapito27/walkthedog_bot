@@ -1,3 +1,4 @@
+// Package models contains models are used in project
 package models
 
 // Shelter represent shelter information

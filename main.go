@@ -9,18 +9,43 @@ import (
 	"strings"
 	"time"
 
-	google_sheet "walkthedog/internal/google_sheet"
+	sheet "walkthedog/internal/google/sheet"
 	"walkthedog/internal/models"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gopkg.in/yaml.v2"
 )
 
+// Environments
 const (
 	productionEnv  = "production"
 	testEnv        = "test"
 	developmentEnv = "development"
+)
 
+// Commands
+const (
+	commandStart       = "/start"
+	commandMasterclass = "/masterclass"
+	commandError       = "/error"
+
+	// Related to donation
+	commandDonation            = "/donation"
+	commandDonationShelterList = "/donation_shelter_list"
+
+	// Related to Shelter trip process
+	commandGoShelter          = "/go_shelter"
+	commandChooseShelter      = "/choose_shelter"
+	commandTripDates          = "/trip_dates"
+	commandChooseDates        = "/choose_date"
+	commandIsFirstTrip        = "/is_first_trip"
+	commandTripPurpose        = "/trip_purpose"
+	commandHowYouKnowAboutUs  = "/how_you_know_about_us"
+	commandSummaryShelterTrip = "/summary_shelter_trip"
+)
+
+// Phrases
+const (
 	errorWrongShelterName = "не похоже на название приюта"
 )
 
@@ -134,35 +159,35 @@ func main() {
 			var msgObj tgbotapi.MessageConfig
 			//check for commands
 			switch update.Message.Text {
-			case "/start":
+			case commandStart:
 				log.Println("[walkthedog_bot]: Send start message")
 				msgObj = startMessage(chatId)
 				msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 				bot.Send(msgObj)
-				lastMessage = "/start"
-			case "/go_shelter":
+				lastMessage = commandStart
+			case commandGoShelter:
 				log.Println("[walkthedog_bot]: Send appointmentOptionsMessage message")
 				lastMessage = goShelterCommand(bot, &update)
-			case "/choose_shelter":
+			case commandChooseShelter:
 				lastMessage = chooseShelterCommand(bot, &update, &shelters)
-			case "/trip_dates":
+			case commandTripDates:
 				lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
-			case "/masterclass":
+			case commandMasterclass:
 				log.Println("[walkthedog_bot]: Send masterclass")
 				msgObj = masterclass(chatId)
 				bot.Send(msgObj)
-				lastMessage = "/masterclass"
-			case "/donation":
+				lastMessage = commandMasterclass
+			case commandDonation:
 				log.Println("[walkthedog_bot]: Send donation")
 				lastMessage = donationCommand(bot, chatId)
-			case "/donation_shelter_list":
+			case commandDonationShelterList:
 				log.Println("[walkthedog_bot]: Send donationShelterList")
 				msgObj = donationShelterList(chatId, &shelters)
 				bot.Send(msgObj)
-				lastMessage = "/donation_shelter_list"
+				lastMessage = commandDonationShelterList
 			default:
 				switch lastMessage {
-				case "/go_shelter":
+				case commandGoShelter:
 					if update.Message.Text == "Приют" {
 						lastMessage = chooseShelterCommand(bot, &update, &shelters)
 					} else if update.Message.Text == "Время" {
@@ -173,7 +198,7 @@ func main() {
 						break
 					}
 				// when shelter was chosen next step to chose date
-				case "/choose_shelter":
+				case commandChooseShelter:
 					if newTripToShelter == nil {
 						newTripToShelter = NewTripToShelter(update.Message.From.UserName)
 					}
@@ -189,26 +214,26 @@ func main() {
 					log.Println("[walkthedog_bot]: Send whichDate question")
 					msgObj = whichDate(chatId, shelter)
 					bot.Send(msgObj)
-					lastMessage = "/choose_date"
-				case "/choose_date":
+					lastMessage = commandChooseDates
+				case commandChooseDates:
 					lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
-				case "/is_first_trip":
+				case commandIsFirstTrip:
 					lastMessage, err = tripPurposeCommand(bot, &update, newTripToShelter)
 					if err != nil {
 						ErrorFrontend(bot, &update, newTripToShelter, err.Error())
 						lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
 					}
-				case "/trip_purpose":
+				case commandTripPurpose:
 					ErrorFrontend(bot, &update, newTripToShelter, "Выберите цели поездки и нажмите кнопку голосовать")
-				case "/how_you_know_about_us":
+				case commandHowYouKnowAboutUs:
 					ErrorFrontend(bot, &update, newTripToShelter, "Расскажите как вы о нас узнали")
 				default:
 					log.Println("[walkthedog_bot]: Unknown command")
 
-					message := "Не понимаю 🐶 Попробуй /start"
+					message := "Не понимаю 🐶 Попробуй " + commandStart
 					msgObj := tgbotapi.NewMessage(chatId, message)
 					bot.Send(msgObj)
-					lastMessage = "/choose_date"
+					lastMessage = commandChooseDates
 				}
 			}
 		} else if update.Poll != nil {
@@ -219,28 +244,27 @@ func main() {
 			log.Printf("lastMessage: %s", lastMessage)
 
 			switch lastMessage {
-			case "/trip_purpose":
+			case commandTripPurpose:
 				for _, option := range update.PollAnswer.OptionIDs {
 					newTripToShelter.Purpose = append(newTripToShelter.Purpose, purposes[option])
 				}
 
 				lastMessage = howYouKnowAboutUsCommand(bot, &update, newTripToShelter)
-			case "/how_you_know_about_us":
+			case commandHowYouKnowAboutUs:
 				for _, option := range update.PollAnswer.OptionIDs {
 					newTripToShelter.HowYouKnowAboutUs = sources[option]
 					break
 				}
 				//save to google sheet
-				srv, err := google_sheet.NewService()
+				srv, err := sheet.NewService()
 				if err != nil {
 					log.Fatalf("Unable to retrieve Sheets client: %v", err)
 				}
 
 				summaryCommand(bot, &update, newTripToShelter)
-				time.Sleep(12 * time.Second)
 				lastMessage = donationCommand(bot, polls[update.PollAnswer.PollID])
-				
-				resp, err := google_sheet.SaveTripToShelter(srv, newTripToShelter)
+
+				resp, err := sheet.SaveTripToShelter(srv, newTripToShelter)
 				if err != nil {
 					log.Fatalf("Unable to write data from sheet: %v", err)
 				}
@@ -261,7 +285,7 @@ func main() {
 func goShelterCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update) string {
 	msgObj := appointmentOptionsMessage(update.Message.Chat.ID)
 	bot.Send(msgObj)
-	return "/go_shelter"
+	return commandGoShelter
 }
 
 // chooseShelterCommand prepares message about available shelters and then sends it and returns last command.
@@ -269,7 +293,7 @@ func chooseShelterCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, shelter
 	log.Println("[walkthedog_bot]: Send whichShelter question")
 	msgObj := whichShelter(update.Message.Chat.ID, shelters)
 	bot.Send(msgObj)
-	return "/choose_shelter"
+	return commandChooseShelter
 }
 
 // isFirstTripCommand prepares message with question "is your first trip?" and then sends it and returns last command.
@@ -277,7 +301,7 @@ func isFirstTripCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 	newTripToShelter.Date = update.Message.Text
 	msgObj := isFirstTrip(update.Message.Chat.ID)
 	bot.Send(msgObj)
-	return "/is_first_trip"
+	return commandIsFirstTrip
 }
 
 // tripPurposeCommand prepares poll with question about your purpose for this trip and then sends it and returns last command.
@@ -287,7 +311,7 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 	} else if update.Message.Text == "Нет" {
 		newTripToShelter.IsFirstTrip = false
 	} else {
-		return "/is_first_trip", errors.New("доступные ответы \"Да\" и \"Нет\"")
+		return commandIsFirstTrip, errors.New("доступные ответы \"Да\" и \"Нет\"")
 	}
 
 	msgObj := tripPurpose(update.Message.Chat.ID)
@@ -295,7 +319,7 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 	responseMessage, _ := bot.Send(msgObj)
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
 
-	return "/trip_purpose", nil
+	return commandTripPurpose, nil
 }
 
 // howYouKnowAboutUsCommand prepares poll with question about where did you know about us and then sends it and returns last command.
@@ -303,21 +327,21 @@ func howYouKnowAboutUsCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, new
 	msgObj := howYouKnowAboutUs(polls[update.PollAnswer.PollID])
 	responseMessage, _ := bot.Send(msgObj)
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
-	return "/how_you_know_about_us"
+	return commandHowYouKnowAboutUs
 }
 
 // summaryCommand prepares message with summary and then sends it and returns last command.
 func summaryCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
 	msgObj := summary(polls[update.PollAnswer.PollID], newTripToShelter)
 	bot.Send(msgObj)
-	return "/summary_shelter_trip"
+	return commandSummaryShelterTrip
 }
 
 // donationCommand prepares message with availabele ways to dontate us or shelters and then sends it and returns last command.
 func donationCommand(bot *tgbotapi.BotAPI, chatId int64) string {
 	msgObj := donation(chatId)
 	bot.Send(msgObj)
-	return "/donation"
+	return commandDonation
 }
 
 // tripDatesCommand prepares message with availabele dates to go to shelters and then sends it and returns last command.
@@ -326,9 +350,9 @@ func tripDatesCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToSh
 		message := "По времени записаться пока нельзя :("
 		msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, message)
 		bot.Send(msgObj)
-		return "/go_shelter"
+		return commandGoShelter
 		/* newTripToShelter = NewTripToShelter(update.Message.From.UserName)
-		if lastMessage == "/choose_shelter" {
+		if lastMessage == commandChooseShelter {
 			panic("change it if I use it")
 			shelter, err := shelters.getShelterByNameID(update.Message.Text)
 
@@ -337,14 +361,14 @@ func tripDatesCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToSh
 				chooseShelterCommand(bot, update, shelters)
 			}
 			newTripToShelter.Shelter = shelter
-		} else if lastMessage == "/go_shelter" {
+		} else if lastMessage == commandGoShelter {
 
 		} */
 	}
 	log.Println("[walkthedog_bot]: Send whichDate question")
 	msgObj := whichDate(update.Message.Chat.ID, nil)
 	bot.Send(msgObj)
-	return "/trip_dates"
+	return commandTripDates
 }
 
 // getShelterByNameID returns Shelter and error using given shelter name in following format:
@@ -379,7 +403,7 @@ func ErrorFrontend(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelt
 	}
 	msgObj := errorMessage(update.Message.Chat.ID, errMessage)
 	bot.Send(msgObj)
-	return "/error"
+	return commandError
 }
 
 // getConfig returns config by environment.
