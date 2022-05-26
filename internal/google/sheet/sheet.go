@@ -106,8 +106,8 @@ func SaveTripToShelter(srv *sheets.Service, tripToShelter *models.TripToShelter)
 		tripToShelter.Date,
 		strconv.FormatBool(tripToShelter.IsFirstTrip),
 		strings.Join(tripToShelter.Purpose, ","),
-		tripToShelter.HowYouKnowAboutUs,
 		tripToShelter.TripBy,
+		tripToShelter.HowYouKnowAboutUs,
 	}
 	vr.Values = append(vr.Values, tripToShelterInfo)
 

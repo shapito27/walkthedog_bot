@@ -40,6 +40,7 @@ const (
 	commandChooseDates        = "/choose_date"
 	commandIsFirstTrip        = "/is_first_trip"
 	commandTripPurpose        = "/trip_purpose"
+	commandTripBy             = "/trip_by"
 	commandHowYouKnowAboutUs  = "/how_you_know_about_us"
 	commandSummaryShelterTrip = "/summary_shelter_trip"
 )
@@ -57,6 +58,15 @@ var purposes = []string{
 	"Привезти корм/медикаменты и т.п. для нужд приюта",
 	"Перевести деньги для приюта",
 	"Есть другие идеи (обязательно расскажите нам на выезде :-)",
+}
+
+// tripByOptions represents list of options to come to shelters.
+var tripByOptions = []string{
+	"Еду на своей машине или с кем-то на машине (мест больше нет)",
+	"Еду на своей машине или с кем-то на машине (готов предложить места другим волонтерам)",
+	"Еду общественным транспортом",
+	"Ищу с кем поехать",
+	"Какой-то другой магический вариант :)",
 }
 
 // sources represents list of available sources of information user knew about walkthedog.
@@ -191,7 +201,10 @@ func main() {
 					if update.Message.Text == "Приют" {
 						lastMessage = chooseShelterCommand(bot, &update, &shelters)
 					} else if update.Message.Text == "Время" {
-						lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
+						//lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
+						ErrorFrontend(bot, &update, newTripToShelter, "Запись по Времени пока не доступна 😥")
+						lastMessage = goShelterCommand(bot, &update)
+						break
 					} else {
 						ErrorFrontend(bot, &update, newTripToShelter, "Нажмите кноку \"Приют\" или \"Время\"")
 						lastMessage = goShelterCommand(bot, &update)
@@ -225,6 +238,8 @@ func main() {
 					}
 				case commandTripPurpose:
 					ErrorFrontend(bot, &update, newTripToShelter, "Выберите цели поездки и нажмите кнопку голосовать")
+				case commandTripBy:
+					ErrorFrontend(bot, &update, newTripToShelter, "Расскажите как добираетесь до приюта")
 				case commandHowYouKnowAboutUs:
 					ErrorFrontend(bot, &update, newTripToShelter, "Расскажите как вы о нас узнали")
 				default:
@@ -249,6 +264,12 @@ func main() {
 					newTripToShelter.Purpose = append(newTripToShelter.Purpose, purposes[option])
 				}
 
+				lastMessage = tripByCommand(bot, &update, newTripToShelter)
+			case commandTripBy:
+				for _, option := range update.PollAnswer.OptionIDs {
+					newTripToShelter.TripBy = tripByOptions[option]
+					break
+				}
 				lastMessage = howYouKnowAboutUsCommand(bot, &update, newTripToShelter)
 			case commandHowYouKnowAboutUs:
 				for _, option := range update.PollAnswer.OptionIDs {
@@ -320,6 +341,14 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
 
 	return commandTripPurpose, nil
+}
+
+// tripByCommand prepares poll with question about how he going to come to shelter and then sends it and returns last command.
+func tripByCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
+	msgObj := tripBy(polls[update.PollAnswer.PollID])
+	responseMessage, _ := bot.Send(msgObj)
+	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
+	return commandTripBy
 }
 
 // howYouKnowAboutUsCommand prepares poll with question about where did you know about us and then sends it and returns last command.
@@ -471,9 +500,11 @@ func donationShelterList(chatId int64, shelters *SheltersList) tgbotapi.MessageC
 // startMessage returns first message with all available commands.
 func startMessage(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
-	message := `- /go_shelter Записаться на выезд в приют
-- /masterclass Записаться на мастерклас
-- /donation Сделать пожертвование`
+	message := `🐕 /go_shelter Записаться на выезд в приют. Участие является бесплатным
+
+📐 /masterclass Записаться на мастерклас
+
+❤️ /donation Сделать пожертвование`
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	return msgObj
@@ -586,7 +617,7 @@ func isFirstTrip(chatId int64) tgbotapi.MessageConfig {
 
 // tripPurpose returns object including poll about trip purpose and other poll config.
 func tripPurpose(chatId int64) tgbotapi.SendPollConfig {
-	message := "Цель поездки"
+	message := "🎯 Цель поездки"
 	options := purposes
 	msgObj := tgbotapi.NewPoll(chatId, message, options...)
 	msgObj.AllowsMultipleAnswers = true
@@ -595,9 +626,19 @@ func tripPurpose(chatId int64) tgbotapi.SendPollConfig {
 	return msgObj
 }
 
+// tripBy returns object including poll about how he/she going to come to shelter poll config.
+func tripBy(chatId int64) tgbotapi.SendPollConfig {
+	message := "🚗 Как добираетесь до приюта?"
+	options := tripByOptions
+	msgObj := tgbotapi.NewPoll(chatId, message, options...)
+	msgObj.IsAnonymous = false
+	msgObj.AllowsMultipleAnswers = false
+	return msgObj
+}
+
 // howYouKnowAboutUs returns object including poll about how he/she know about us and other poll config.
 func howYouKnowAboutUs(chatId int64) tgbotapi.SendPollConfig {
-	message := "Как вы о нас узнали?"
+	message := "🤫 Как вы о нас узнали?"
 	options := sources
 	msgObj := tgbotapi.NewPoll(chatId, message, options...)
 	msgObj.IsAnonymous = false
@@ -609,14 +650,14 @@ func howYouKnowAboutUs(chatId int64) tgbotapi.SendPollConfig {
 func summary(chatId int64, newTripToShelter *models.TripToShelter) tgbotapi.MessageConfig {
 	message := fmt.Sprintf(`Регистрация прошла успешно.
 	
-Информация о событии
+ℹ️ Информация о событии
 Выезд в приют: <a href="%s">%s</a>
 Дата и время: %s
 Место проведения: %s (точный адрес приюта отправляется в чат после регистрации)
 
-За 5-7 дней до выезда мы пришлем вам ссылку для добавления в Whats App чат, где расскажем все детали и ответим на вопросы. До встречи!
+📎 За 5-7 дней до выезда мы пришлем вам ссылку для добавления в Whats App чат, где расскажем все детали и ответим на вопросы. До встречи!
 
-Напоминаем, что участие в выезде в приют является бесплатным. При этом вы можете сделать добровольное пожертвование.
+❤️ Напоминаем, что участие в выезде в приют является бесплатным. При этом вы можете сделать добровольное пожертвование.
 `, newTripToShelter.Shelter.Link,
 		newTripToShelter.Shelter.Title,
 		newTripToShelter.Date,
