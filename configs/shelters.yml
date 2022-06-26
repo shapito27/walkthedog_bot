@@ -4,6 +4,7 @@
   address: "Московская область, городской округ Истра, деревня Карцево"
   link: "https://walkthedog.ru/huskyhelp"
   donate_link: "https://www.tinkoff.ru/sl/1msxKU5XTyS"
+  guide: "https://docs.google.com/document/d/1ywdrkhIetPEK3-pBFwysDFBslxQ7QBzsb9b95hxEh_k/"
   schedule:
     type: "regularly"
     details: [1, 6]
@@ -12,9 +13,10 @@
 2:
   id: 2
   title: "Приют \"Ника\" (Зеленоград)"
-  address: ""
+  address: "г. Зеленоград"
   link: https://walkthedog.ru/nika
   donate_link: "https://www.tinkoff.ru/sl/A3izVb5Cyzn"
+  guide: "https://docs.google.com/document/d/1w9bOj_fuELO246nvHqwW8rb9qJ2I61R6lKQactHC8JQ/edit?usp=sharing"
   schedule:
     type: "regularly"
     details: [2, 6]
@@ -23,9 +25,10 @@
 3:
   id: 3
   title: "Приют \"Шанс\" (Save Husky, Щелково)"
-  address: ""
+  address: "Московская область, Щелково"
   link: "https://walkthedog.ru/savehusky"
   donate_link: "https://www.tinkoff.ru/cf/5OrkCaUBo5D"
+  guide: ""
   schedule:
     type: "regularly"
     details: [2, 7]
@@ -34,9 +37,10 @@
 4:
   id: 4
   title: "Приют \"Домашний\" (Балашиха)"
-  address: ""
+  address: "Московская область, Балашиха"
   link: "https://walkthedog.ru/domashniy_balashikha"
   donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"
+  guide: "https://docs.google.com/document/d/13ERK_jKTfoJvHZxIb8MQjleZWZVsbNmmoVUMYh-gPeA/edit"
   schedule:
     type: "regularly"
     details: [3, 6]
@@ -45,9 +49,10 @@
 5:
   id: 5
   title: "Биозона (Воскресенск)"
-  address: ""
+  address: "пгт Белоозерский, Воскресенский район Московской области"
   link: "https://walkthedog.ru/biozona"
   donate_link: "https://www.tinkoff.ru/sl/AG2GLNF5aun"
+  guide: "https://docs.google.com/document/d/1exL74Apb3mrQFOl4r4zYEiE1W4wNJpbXTPTqPpWE8TI/edit"
   schedule:
     type: "regularly"
     details: [3, 6]
@@ -59,6 +64,7 @@
   address: ""
   link: "https://walkthedog.ru/domashniy_annino"
   donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"
+  guide: "https://docs.google.com/document/d/1GtKQAg21rUzDzG_1i9bDrZ6I67v9qgV_noQCIk8b8cc/edit"
   schedule:
     type: "regularly"
     details: [4, 6]
@@ -67,9 +73,10 @@
 7:
   id: 7
   title: "Центр \"Мокрый нос\" (Зеленоград)"
-  address: ""
+  address: "северо-запад Москвы в в Солнечногорском района (недалеко от приюта Ника)"
   link: "https://walkthedog.ru/wetnose"
   donate_link: "https://www.tinkoff.ru/sl/A3izVb5Cyzn"
+  guide: "https://docs.google.com/document/d/1KpHXsjfyDC_9tiPBzc_56o5c7vYQJwCeMi-F5qxX_BM/edit"
   schedule:
     type: "regularly"
     details: [4, 7]
@@ -78,9 +85,10 @@
 8:
   id: 8
   title: "Зоотель \"Лемур\" (Воскресенск)"
-  address: ""
+  address: "г. Воскресенск на юго-востоке от Москвы (80 км от МКАД по Новорязанское шоссе)"
   link: "https://walkthedog.ru/lemur"
   donate_link: "https://www.tinkoff.ru/sl/24qy6x8P4MP"
+  guide: ""
   schedule:
     type: "everyday"
     details: []

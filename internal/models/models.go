@@ -8,6 +8,7 @@ type Shelter struct {
 	DonateLink string          `yaml:"donate_link"`
 	Title      string          `yaml:"title"`
 	Link       string          `yaml:"link"`
+	Guide      string          `yaml:"guide"`
 	Schedule   ShelterSchedule `yaml:"schedule"`
 }
 

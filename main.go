@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"walkthedog/internal/dates"
 	sheet "walkthedog/internal/google/sheet"
 	"walkthedog/internal/models"
 
@@ -104,7 +105,7 @@ func NewTripToShelter(userName string) *models.TripToShelter {
 
 func main() {
 	// getting config by environment
-	env := developmentEnv
+	env := productionEnv //developmentEnv
 	config, err := getConfig(env)
 	if err != nil {
 		log.Panic(err)
@@ -276,21 +277,22 @@ func main() {
 					newTripToShelter.HowYouKnowAboutUs = sources[option]
 					break
 				}
-				//save to google sheet
-				srv, err := sheet.NewService()
-				if err != nil {
-					log.Fatalf("Unable to retrieve Sheets client: %v", err)
-				}
 
 				summaryCommand(bot, &update, newTripToShelter)
 				lastMessage = donationCommand(bot, polls[update.PollAnswer.PollID])
 
-				resp, err := sheet.SaveTripToShelter(srv, newTripToShelter)
+				//save to google sheet
+				srv, err := sheet.NewService()
 				if err != nil {
-					log.Fatalf("Unable to write data from sheet: %v", err)
-				}
-				if resp.ServerResponse.HTTPStatusCode != 200 {
-					fmt.Printf("error: %+v", resp)
+					log.Fatalf(err.Error())
+				} else {
+					resp, err := sheet.SaveTripToShelter(srv, newTripToShelter)
+					if err != nil {
+						log.Fatalf("Unable to write data from sheet: %v", err)
+					}
+					if resp.ServerResponse.HTTPStatusCode != 200 {
+						log.Fatalf("error: %+v", resp)
+					}
 				}
 			}
 		}
@@ -582,12 +584,12 @@ func whichDate(chatId int64, shelter *models.Shelter) tgbotapi.MessageConfig {
 
 			day := calculateDay(scheduleDay, scheduleWeek, month)
 			//TODO:display on russian lang
-			log.Println(day.Format("Mon 2 Jan") + " " + scheduleTime)
+			log.Println(dates.WeekDaysRu[day.Weekday()] + " " + day.Format("2 Jan") + " " + scheduleTime)
 			if i == 0 && time.Now().Day() > day.Day() {
 				continue
 			}
 			buttonRow := tgbotapi.NewKeyboardButtonRow(
-				tgbotapi.NewKeyboardButton(day.Format("Mon 02.01.2006") + " " + scheduleTime),
+				tgbotapi.NewKeyboardButton(dates.WeekDaysRu[day.Weekday()] + " " + day.Format("02.01.2006") + " " + scheduleTime),
 			)
 			dateButtons = append(dateButtons, buttonRow)
 
@@ -648,20 +650,27 @@ func howYouKnowAboutUs(chatId int64) tgbotapi.SendPollConfig {
 
 // summary returns object including message text with summary of user's answers and other message config.
 func summary(chatId int64, newTripToShelter *models.TripToShelter) tgbotapi.MessageConfig {
+	guide := `Место проведения: %s (точный адрес приюта отправляется в чат после регистрации)
+
+📎 За 5-7 дней до выезда мы пришлем вам ссылку для добавления в Whats App чат, где расскажем все детали и ответим на вопросы. До встречи!
+	`
+	if newTripToShelter.Shelter.Guide != "" {
+		guide = "Как добраться: " + newTripToShelter.Shelter.Guide
+	} else {
+		guide = fmt.Sprintf(guide, newTripToShelter.Shelter.Address)
+	}
 	message := fmt.Sprintf(`Регистрация прошла успешно.
 	
 ℹ️ Информация о событии
 Выезд в приют: <a href="%s">%s</a>
 Дата и время: %s
-Место проведения: %s (точный адрес приюта отправляется в чат после регистрации)
-
-📎 За 5-7 дней до выезда мы пришлем вам ссылку для добавления в Whats App чат, где расскажем все детали и ответим на вопросы. До встречи!
+%s
 
 ❤️ Напоминаем, что участие в выезде в приют является бесплатным. При этом вы можете сделать добровольное пожертвование.
 `, newTripToShelter.Shelter.Link,
 		newTripToShelter.Shelter.Title,
 		newTripToShelter.Date,
-		newTripToShelter.Shelter.Address)
+		guide)
 	msgObj := tgbotapi.NewMessage(chatId, message)
 	msgObj.ParseMode = tgbotapi.ModeHTML
 
