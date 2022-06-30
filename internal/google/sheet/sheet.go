@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -100,6 +101,7 @@ func SaveTripToShelter(srv *sheets.Service, tripToShelter *models.TripToShelter)
 	spreadsheetId := "1sGRvjVEP4OvT4JubFmn9pp_h72vwO5aSHvZdUFoEFsY"
 
 	var vr sheets.ValueRange
+	now := time.Now()
 	tripToShelterInfo := []interface{}{
 		tripToShelter.Username,
 		tripToShelter.Shelter.Title,
@@ -108,10 +110,11 @@ func SaveTripToShelter(srv *sheets.Service, tripToShelter *models.TripToShelter)
 		strings.Join(tripToShelter.Purpose, ","),
 		tripToShelter.TripBy,
 		tripToShelter.HowYouKnowAboutUs,
+		now.Format("02.01.2006 15:04:05"),
 	}
 	vr.Values = append(vr.Values, tripToShelterInfo)
 
-	readRange := "Trips!A2:E"
+	readRange := "Trips!A2:H"
 
 	return srv.Spreadsheets.Values.Append(spreadsheetId, readRange, &vr).ValueInputOption("RAW").Do()
 }

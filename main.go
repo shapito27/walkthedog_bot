@@ -13,6 +13,7 @@ import (
 	sheet "walkthedog/internal/google/sheet"
 	"walkthedog/internal/models"
 
+	"github.com/davecgh/go-spew/spew"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"gopkg.in/yaml.v2"
 )
@@ -230,12 +231,21 @@ func main() {
 					bot.Send(msgObj)
 					lastMessage = commandChooseDates
 				case commandChooseDates:
-					lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
+					if isTripDateValid(update.Message.Text, newTripToShelter) {
+						lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
+					} else {
+						ErrorFrontend(bot, &update, newTripToShelter, "Кажется вы ошиблись с датой 🤔")
+						lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
+					}
 				case commandIsFirstTrip:
 					lastMessage, err = tripPurposeCommand(bot, &update, newTripToShelter)
 					if err != nil {
 						ErrorFrontend(bot, &update, newTripToShelter, err.Error())
-						lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
+						if isTripDateValid(update.Message.Text, newTripToShelter) {
+							lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
+						} else {
+							lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
+						}
 					}
 				case commandTripPurpose:
 					ErrorFrontend(bot, &update, newTripToShelter, "Выберите цели поездки и нажмите кнопку голосовать")
@@ -327,6 +337,19 @@ func isFirstTripCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 	return commandIsFirstTrip
 }
 
+// isTripDateValid return true if it's one of the available dates of shelter trip.
+func isTripDateValid(date string, newTripToShelter *models.TripToShelter) bool {
+	isCorrectDate := false
+	shelterDates := getDatesByShelter(newTripToShelter.Shelter)
+	for _, v := range shelterDates {
+		if v == date {
+			isCorrectDate = true
+			break
+		}
+	}
+	return isCorrectDate
+}
+
 // tripPurposeCommand prepares poll with question about your purpose for this trip and then sends it and returns last command.
 func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) (string, error) {
 	if update.Message.Text == "Да" {
@@ -397,9 +420,9 @@ func tripDatesCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToSh
 		} */
 	}
 	log.Println("[walkthedog_bot]: Send whichDate question")
-	msgObj := whichDate(update.Message.Chat.ID, nil)
+	msgObj := whichDate(update.Message.Chat.ID, newTripToShelter.Shelter)
 	bot.Send(msgObj)
-	return commandTripDates
+	return commandChooseDates
 }
 
 // getShelterByNameID returns Shelter and error using given shelter name in following format:
@@ -560,48 +583,46 @@ func whichDate(chatId int64, shelter *models.Shelter) tgbotapi.MessageConfig {
 	message := "Выберите дату выезда:"
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
-	now := time.Now()
-	currentYear, currentMonth, _ := now.Date()
-	currentLocation := now.Location()
-
-	firstOfMonth := time.Date(currentYear, currentMonth, 1, 0, 0, 0, 0, currentLocation)
-
-	fmt.Println(firstOfMonth)
-
 	var numericKeyboard tgbotapi.ReplyKeyboardMarkup
-	log.Println(shelter)
-	log.Println(*shelter)
-	log.Println(shelter.Schedule)
+	var dateButtons [][]tgbotapi.KeyboardButton
 
+	shelterDates := getDatesByShelter(shelter)
+	for _, value := range shelterDates {
+		buttonRow := tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(value),
+		)
+		dateButtons = append(dateButtons, buttonRow)
+	}
+	numericKeyboard = tgbotapi.NewReplyKeyboard(dateButtons...)
+
+	msgObj.ReplyMarkup = numericKeyboard
+	return msgObj
+}
+
+// getDatesByShelter return list of dates.
+func getDatesByShelter(shelter *models.Shelter) []string {
+	var shedule []string
+	now := time.Now()
+	spew.Dump(shelter)
 	if shelter.Schedule.Type == "regularly" {
 
 		scheduleWeek := shelter.Schedule.Details[0]
 		scheduleDay := shelter.Schedule.Details[1]
 		scheduleTime := shelter.Schedule.TimeStart
-		var dateButtons [][]tgbotapi.KeyboardButton
 		for i := 0; i < 6; i++ {
-			month := time.Month(int(time.Now().Month()) + i)
-
+			month := time.Month(int(now.Month()) + i)
 			day := calculateDay(scheduleDay, scheduleWeek, month)
-			//TODO:display on russian lang
-			log.Println(dates.WeekDaysRu[day.Weekday()] + " " + day.Format("2 Jan") + " " + scheduleTime)
-			if i == 0 && time.Now().Day() > day.Day() {
+			if i == 0 && now.Day() > day.Day() {
 				continue
 			}
-			buttonRow := tgbotapi.NewKeyboardButtonRow(
-				tgbotapi.NewKeyboardButton(dates.WeekDaysRu[day.Weekday()] + " " + day.Format("02.01.2006") + " " + scheduleTime),
-			)
-			dateButtons = append(dateButtons, buttonRow)
+			shedule = append(shedule, dates.WeekDaysRu[day.Weekday()]+" "+day.Format("02.01.2006")+" "+scheduleTime)
 
 		}
-		numericKeyboard = tgbotapi.NewReplyKeyboard(dateButtons...)
-		//}
 	} else if shelter.Schedule.Type == "everyday" {
 		//TODO: finish everyday type
 	}
 
-	msgObj.ReplyMarkup = numericKeyboard
-	return msgObj
+	return shedule
 }
 
 // isFirstTrip returns object including message text "is your first trip" and other message config.
