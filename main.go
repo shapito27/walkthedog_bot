@@ -340,6 +340,14 @@ func isFirstTripCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 // isTripDateValid return true if it's one of the available dates of shelter trip.
 func isTripDateValid(date string, newTripToShelter *models.TripToShelter) bool {
 	isCorrectDate := false
+
+	if newTripToShelter == nil {
+		return false
+	}
+	if newTripToShelter.Shelter == nil {
+		return false
+	}
+
 	shelterDates := getDatesByShelter(newTripToShelter.Shelter)
 	for _, v := range shelterDates {
 		if v == date {
