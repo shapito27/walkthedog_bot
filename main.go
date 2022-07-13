@@ -73,16 +73,17 @@ var tripByOptions = []string{
 
 // sources represents list of available sources of information user knew about walkthedog.
 var sources = []string{
-	"Сарафанное радио или друзья, родственники, коллеги",
-	"Сайт walkthedog.ru (погуляйсобаку.рф)",
+	"Сарафанное радио (друзья, родственники, коллеги)",
 	"Выставка или ярмарка",
 	"Нашел в интернете",
-	"Радио или ТВ",
+	"Мосволонтер",
 	"Вконтакте",
-	"Facebook",
-	"Instagram",
 	"Наш канал в WhatsApp",
 	"Наш канал в Telegram",
+	"Другие социальные сети",
+	"Авито/Юла",
+	"Знаю вас уже давно :)",
+	"Другой вариант",
 }
 
 // statePool store all chat states
@@ -507,7 +508,7 @@ func getShelters() (SheltersList, error) {
 // masterclass returns masterclasses.
 func masterclass(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
-	message := `TODO masterclass message`
+	message := `Запись на мастер-классы скоро здесь появится, а пока вы можете записаться на ближайший на walkthedog.ru/cages`
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	return msgObj
@@ -533,11 +534,15 @@ func donationShelterList(chatId int64, shelters *SheltersList) tgbotapi.MessageC
 // startMessage returns first message with all available commands.
 func startMessage(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
-	message := `🐕 /go_shelter Записаться на выезд в приют. Участие является бесплатным
+	message := `🐕 /go_shelter Записаться на выезд в приют
 
-📐 /masterclass Записаться на мастерклас
+📐 /masterclass Записаться на мастер-класс по изготовлению будок и котодомиков для приютов
 
-❤️ /donation Сделать пожертвование`
+❤️ /donation Сделать пожертвование
+
+@walkthedog_support Задать вопрос или предложить добрую идею
+
+@walkthedog Подписаться на наш телеграм канал`
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	return msgObj
@@ -546,12 +551,12 @@ func startMessage(chatId int64) tgbotapi.MessageConfig {
 // appointmentOptionsMessage returns message with 2 options.
 func appointmentOptionsMessage(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
-	message := "Вы можете выбрать время выезда или конкретный приют"
+	message := "Вы можете записаться на выезд в приют исходя из даты (напр. хотите поехать в ближайшие выходные) или выбрать конкретный приют и записаться на ближайший выезд в него. На страничке walkthedog.ru/shelters есть удобная карта, которая покажет ближайший к вам приют."
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	var numericKeyboard = tgbotapi.NewReplyKeyboard(tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("Время"),
-		tgbotapi.NewKeyboardButton("Приют"),
+		tgbotapi.NewKeyboardButton("Выбор по дате"),
+		tgbotapi.NewKeyboardButton("Выбор по приюту"),
 	))
 	msgObj.ReplyMarkup = numericKeyboard
 	return msgObj
@@ -648,7 +653,7 @@ func isFirstTrip(chatId int64) tgbotapi.MessageConfig {
 
 // tripPurpose returns object including poll about trip purpose and other poll config.
 func tripPurpose(chatId int64) tgbotapi.SendPollConfig {
-	message := "🎯 Цель поездки"
+	message := "🎯 Чем хочу помочь"
 	options := purposes
 	msgObj := tgbotapi.NewPoll(chatId, message, options...)
 	msgObj.AllowsMultipleAnswers = true
@@ -684,7 +689,7 @@ func summary(chatId int64, newTripToShelter *models.TripToShelter) tgbotapi.Mess
 📎 За 5-7 дней до выезда мы пришлем вам ссылку для добавления в Whats App чат, где расскажем все детали и ответим на вопросы. До встречи!
 	`
 	if newTripToShelter.Shelter.Guide != "" {
-		guide = "Как добраться: " + newTripToShelter.Shelter.Guide
+		guide = "Все детали о выезде в приют включая адрес, как доехать, что взять и потребности приюта: " + newTripToShelter.Shelter.Guide
 	} else {
 		guide = fmt.Sprintf(guide, newTripToShelter.Shelter.Address)
 	}
@@ -696,6 +701,10 @@ func summary(chatId int64, newTripToShelter *models.TripToShelter) tgbotapi.Mess
 %s
 
 ❤️ Напоминаем, что участие в выезде в приют является бесплатным. При этом вы можете сделать добровольное пожертвование.
+
+💬 За 5 дней до выезда мы добавим вас в телеграм-чат выезда, где можно будет задать вопросы и уточнить о волонтерах, у кого будут места в машине.
+
+Если у вас появятся вопросы до добавления в чат - пишите @walkthedog_support
 `, newTripToShelter.Shelter.Link,
 		newTripToShelter.Shelter.Title,
 		newTripToShelter.Date,
@@ -710,11 +719,12 @@ func summary(chatId int64, newTripToShelter *models.TripToShelter) tgbotapi.Mess
 func donation(chatId int64) tgbotapi.MessageConfig {
 	message :=
 		`Добровольное пожертвование в 500 рублей и более осчастливит 1 собаку (500 рублей = 2 недели питания одной собаки в приюте). Все собранные деньги будут переданы в приют.
+
 📍 /donation_shelter_list - пожертвовать в конкретный приют
-📍 Перевод по номеру телефона +7 916 085 1342 (Михайлов Дмитрий) - укажите название приюта.
-📍 Перевод по номеру карты 4377 7314 2793 9183 (Тинькоф), 5336 6903 0880 6803 (Сбербанк), 5559 4928 1417 6700 (Альфабанк) - укажите название приюта.
+
+📍 Перевод по номеру телефона +7 916 085 1342 (Михайлов Дмитрий) - укажите "пожертвование".
+
 📍 <a href="https://yoomoney.ru/to/410015848442299">Яндекс.Деньги</a>
-📍 <a href="https://www.paypal.com/paypalme/monblan">PayPal</a>
 `
 	msgObj := tgbotapi.NewMessage(chatId, message)
 	msgObj.ParseMode = tgbotapi.ModeHTML
