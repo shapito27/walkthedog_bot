@@ -47,6 +47,12 @@ const (
 	commandSummaryShelterTrip = "/summary_shelter_trip"
 )
 
+// Answers
+const (
+	chooseByShelter = "Выбор по приюту"
+	chooseByDate    = "Выбор по дате"
+)
+
 // Phrases
 const (
 	errorWrongShelterName = "не похоже на название приюта"
@@ -201,15 +207,15 @@ func main() {
 			default:
 				switch lastMessage {
 				case commandGoShelter:
-					if update.Message.Text == "Приют" {
+					if update.Message.Text == chooseByShelter {
 						lastMessage = chooseShelterCommand(bot, &update, &shelters)
-					} else if update.Message.Text == "Время" {
+					} else if update.Message.Text == chooseByDate {
 						//lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
 						ErrorFrontend(bot, &update, newTripToShelter, "Запись по Времени пока не доступна 😥")
 						lastMessage = goShelterCommand(bot, &update)
 						break
 					} else {
-						ErrorFrontend(bot, &update, newTripToShelter, "Нажмите кноку \"Приют\" или \"Время\"")
+						ErrorFrontend(bot, &update, newTripToShelter, fmt.Sprintf("Нажмите кноку \"%s\" или \"%s\"", chooseByDate, chooseByShelter))
 						lastMessage = goShelterCommand(bot, &update)
 						break
 					}
@@ -555,8 +561,8 @@ func appointmentOptionsMessage(chatId int64) tgbotapi.MessageConfig {
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	var numericKeyboard = tgbotapi.NewReplyKeyboard(tgbotapi.NewKeyboardButtonRow(
-		tgbotapi.NewKeyboardButton("Выбор по дате"),
-		tgbotapi.NewKeyboardButton("Выбор по приюту"),
+		tgbotapi.NewKeyboardButton(chooseByDate),
+		tgbotapi.NewKeyboardButton(chooseByShelter),
 	))
 	msgObj.ReplyMarkup = numericKeyboard
 	return msgObj
