@@ -83,7 +83,7 @@ var sources = []string{
 	"Выставка или ярмарка",
 	"Нашел в интернете",
 	"Мосволонтер",
-	"Вконтакте",
+	//"Вконтакте",
 	"Наш канал в WhatsApp",
 	"Наш канал в Telegram",
 	"Другие социальные сети",
@@ -377,7 +377,10 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 
 	msgObj := tripPurpose(update.Message.Chat.ID)
 
-	responseMessage, _ := bot.Send(msgObj)
+	responseMessage, err := bot.Send(msgObj)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
 
 	return commandTripPurpose, nil
@@ -386,7 +389,10 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 // tripByCommand prepares poll with question about how he going to come to shelter and then sends it and returns last command.
 func tripByCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
 	msgObj := tripBy(polls[update.PollAnswer.PollID])
-	responseMessage, _ := bot.Send(msgObj)
+	responseMessage, err := bot.Send(msgObj)
+	if err != nil {
+		log.Fatalln(err)
+	}
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
 	return commandTripBy
 }
@@ -394,7 +400,15 @@ func tripByCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelt
 // howYouKnowAboutUsCommand prepares poll with question about where did you know about us and then sends it and returns last command.
 func howYouKnowAboutUsCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
 	msgObj := howYouKnowAboutUs(polls[update.PollAnswer.PollID])
-	responseMessage, _ := bot.Send(msgObj)
+	responseMessage, err := bot.Send(msgObj)
+
+	if err != nil {
+		//@TODO if i got error here I don't have chat id in response(but have PollAnswer.PollID and PollAnswer.User). So need to get chat id and display error that bot is broken.
+		log.Fatalln(err)
+		/* ErrorFrontend(bot, update, newTripToShelter, "У бота временные проблемы 😥")
+		return commandError */
+	}
+
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
 	return commandHowYouKnowAboutUs
 }
