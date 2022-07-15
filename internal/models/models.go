@@ -3,21 +3,23 @@ package models
 
 // Shelter represent shelter information
 type Shelter struct {
-	ID         string          `yaml:"id"`
-	Address    string          `yaml:"address"`
-	DonateLink string          `yaml:"donate_link"`
-	Title      string          `yaml:"title"`
-	Link       string          `yaml:"link"`
-	Guide      string          `yaml:"guide"`
-	Schedule   ShelterSchedule `yaml:"schedule"`
+	ID          string          `yaml:"id"`
+	Address     string          `yaml:"address"`
+	DonateLink  string          `yaml:"donate_link"`
+	Title       string          `yaml:"title"`
+	Link        string          `yaml:"link"`
+	Guide       string          `yaml:"guide"`
+	PeopleLimit int32           `yaml:"people_limit"`
+	Schedule    ShelterSchedule `yaml:"schedule"`
 }
 
 // ShelterSchedule represents trips shedule to shelters
 type ShelterSchedule struct {
-	Type      string `yaml:"type"`
-	Details   []int  `yaml:"details"`
-	TimeStart string `yaml:"time_start"`
-	TimeEnd   string `yaml:"time_end"`
+	Type            string   `yaml:"type"`
+	Details         []int    `yaml:"details"`
+	DatesExceptions []string `yaml:"dates_exceptions"`
+	TimeStart       string   `yaml:"time_start"`
+	TimeEnd         string   `yaml:"time_end"`
 }
 
 // TripToShelter represents all important information about user's trip to shelter.
@@ -41,4 +43,19 @@ type State struct {
 type TelegramConfig struct {
 	APIToken string `yaml:"api_token"`
 	Timeout  int    `yaml:"timeout"`
+}
+type TelegramEnvironment struct {
+	Environment    string                     `yaml:"environment"`
+	TelegramConfig map[string]*TelegramConfig `yaml:"environments"`
+}
+type Administration struct {
+	Admin string `yaml:"admin"`
+}
+type Google struct {
+	SpreadsheetID string `yaml:"spreadsheet_id"`
+}
+type AppConfig struct {
+	TelegramEnvironment *TelegramEnvironment `yaml:"telegram"`
+	Administration      *Administration      `yaml:"administration"`
+	Google              *Google              `yaml:"google"`
 }

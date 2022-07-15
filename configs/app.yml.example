@@ -1,3 +1,16 @@
-environment: development
-telegram_api_token: ""
-timeout: 60
+telegram:
+  environment: "development"
+  environments:
+    development:
+      api_token: ""
+      timeout: 60
+    test:
+      api_token: ""
+      timeout: 60
+    production:
+      api_token: ""
+      timeout: 60
+administration:
+  admin: "admin"
+google:
+  spreadsheet_id: ""

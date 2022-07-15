@@ -15,7 +15,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Environments
@@ -45,6 +45,10 @@ const (
 	commandTripBy             = "/trip_by"
 	commandHowYouKnowAboutUs  = "/how_you_know_about_us"
 	commandSummaryShelterTrip = "/summary_shelter_trip"
+
+	// System
+	commandRereadShelters  = "/reread_shelters"
+	commandRereadAppConfig = "/reread_app_config"
 )
 
 // Answers
@@ -80,15 +84,14 @@ var tripByOptions = []string{
 // sources represents list of available sources of information user knew about walkthedog.
 var sources = []string{
 	"Сарафанное радио (друзья, родственники, коллеги)",
-	"Выставка или ярмарка",
 	"Нашел в интернете",
-	"Мосволонтер",
-	//"Вконтакте",
-	"Наш канал в WhatsApp",
-	"Наш канал в Telegram",
+	"Telegram",
+	"WhatsApp",
+	"Вконтакте",
 	"Другие социальные сети",
 	"Авито/Юла",
-	"Знаю вас уже давно :)",
+	"Мосволонтер",
+	"Знаю вас уже давно",
 	"Другой вариант",
 }
 
@@ -98,8 +101,6 @@ var statePool = make(map[int64]*models.State)
 //TODO: remove poll_id after answer.
 // polls stores poll_id => chat_id
 var polls = make(map[string]int64)
-
-type EnvironmentConfig map[string]*models.TelegramConfig
 
 // SheltersList represents list of Shelters
 type SheltersList map[int]*models.Shelter
@@ -112,20 +113,21 @@ func NewTripToShelter(userName string) *models.TripToShelter {
 }
 
 func main() {
-	// getting config by environment
-	env := productionEnv //developmentEnv
-	config, err := getConfig(env)
+	config, err := getConfig()
 	if err != nil {
 		log.Panic(err)
 	}
+
+	curEnvironment := config.TelegramEnvironment.Environment
+	telegramConfig := config.TelegramEnvironment.TelegramConfig[curEnvironment]
 
 	// bot init
-	bot, err := tgbotapi.NewBotAPI(config.APIToken)
+	bot, err := tgbotapi.NewBotAPI(telegramConfig.APIToken)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	if env == developmentEnv {
+	if curEnvironment == developmentEnv {
 		bot.Debug = true
 	}
 
@@ -133,7 +135,7 @@ func main() {
 
 	// set how often check for updates
 	u := tgbotapi.NewUpdate(0)
-	u.Timeout = config.Timeout
+	u.Timeout = telegramConfig.Timeout
 
 	updates := bot.GetUpdatesChan(u)
 
@@ -170,8 +172,11 @@ func main() {
 		// initilize last message and trip to shelter
 		lastMessage = state.LastMessage
 		newTripToShelter = state.TripToShelter
+		var isAdmin bool
 
-		if update.Message != nil { // If we got a message
+		// If we got a message
+		if update.Message != nil {
+			isAdmin = update.Message.From.UserName == config.Administration.Admin
 			log.Printf("[%s]: %s", update.Message.From.UserName, update.Message.Text)
 			log.Printf("lastMessage: %s", lastMessage)
 
@@ -204,6 +209,26 @@ func main() {
 				msgObj = donationShelterList(chatId, &shelters)
 				bot.Send(msgObj)
 				lastMessage = commandDonationShelterList
+			//system commands
+			case commandRereadShelters:
+				if isAdmin {
+					// getting shelters again
+					shelters, err = getShelters()
+					if err != nil {
+						log.Panic(err)
+					}
+					log.Println("[walkthedog_bot]: Shelters list was reread")
+					lastMessage = commandRereadShelters
+				}
+			case commandRereadAppConfig:
+				if isAdmin {
+					config, err = getConfig()
+					if err != nil {
+						log.Panic(err)
+					}
+					log.Println("[walkthedog_bot]: App config was reread")
+					lastMessage = commandRereadAppConfig
+				}
 			default:
 				switch lastMessage {
 				case commandGoShelter:
@@ -273,6 +298,7 @@ func main() {
 			//log.Printf("[%s]: %s", update.FromChat().FirstName, "save poll id")
 			//polls[update.Poll.ID] = update.FromChat().ID
 		} else if update.PollAnswer != nil {
+			isAdmin = update.PollAnswer.User.UserName == config.Administration.Admin
 			log.Printf("[%s]: %v", update.PollAnswer.User.UserName, update.PollAnswer.OptionIDs)
 			log.Printf("lastMessage: %s", lastMessage)
 
@@ -490,24 +516,18 @@ func ErrorFrontend(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelt
 }
 
 // getConfig returns config by environment.
-func getConfig(environment string) (*models.TelegramConfig, error) {
-	yamlFile, err := ioutil.ReadFile("configs/telegram.yml")
-	if err != nil {
-		return nil, err
-	}
-	var environmentConfig EnvironmentConfig
-	err = yaml.Unmarshal(yamlFile, &environmentConfig)
+func getConfig() (*models.AppConfig, error) {
+	yamlFile, err := ioutil.ReadFile("configs/app.yml")
 	if err != nil {
 		return nil, err
 	}
 
-	if environmentConfig[environment] == nil {
-		return nil, errors.New("wrong environment set")
+	var appConfig models.AppConfig
+	err = yaml.Unmarshal(yamlFile, &appConfig)
+	if err != nil {
+		return nil, err
 	}
-
-	log.Println(environmentConfig[environment])
-
-	return environmentConfig[environment], nil
+	return &appConfig, nil
 }
 
 // getShelters returns list of shelters with information about them.
@@ -530,6 +550,7 @@ func masterclass(chatId int64) tgbotapi.MessageConfig {
 	//ask about what shelter are you going
 	message := `Запись на мастер-классы скоро здесь появится, а пока вы можете записаться на ближайший на walkthedog.ru/cages`
 	msgObj := tgbotapi.NewMessage(chatId, message)
+	msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 
 	return msgObj
 }
