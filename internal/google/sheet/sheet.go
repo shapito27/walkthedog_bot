@@ -21,6 +21,24 @@ import (
 	"walkthedog/internal/models"
 )
 
+type googleSheet struct {
+	SpreadsheetID string
+	Service       *sheets.Service
+}
+
+func NewGoogleSpreadsheet(google models.Google) *googleSheet {
+	//save to google sheet
+	srv, err := NewService()
+	if err != nil {
+		log.Fatalf(err.Error())
+	}
+
+	return &googleSheet{
+		SpreadsheetID: google.SpreadsheetID,
+		Service:       srv,
+	}
+}
+
 // Retrieve a token, saves the token, then returns the generated client.
 func getClient(config *oauth2.Config) *http.Client {
 	// The file token.json stores the user's access and refresh tokens, and is
@@ -96,8 +114,6 @@ func NewService() (*sheets.Service, error) {
 
 // SaveTripToShelter saves information about trip to google sheet.
 func SaveTripToShelter(srv *sheets.Service, tripToShelter *models.TripToShelter) (*sheets.AppendValuesResponse, error) {
-	// Prints the names and majors of students in a sample spreadsheet:
-	// https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms/edit
 	spreadsheetId := "1sGRvjVEP4OvT4JubFmn9pp_h72vwO5aSHvZdUFoEFsY"
 
 	var vr sheets.ValueRange
@@ -117,6 +133,26 @@ func SaveTripToShelter(srv *sheets.Service, tripToShelter *models.TripToShelter)
 	readRange := "Trips!A2:H"
 
 	return srv.Spreadsheets.Values.Append(spreadsheetId, readRange, &vr).ValueInputOption("RAW").Do()
+}
+
+// CreateSheet creates sheet
+func (googleSheetService googleSheet) CreateSheet(sheetName string) {
+	req := sheets.Request{
+		AddSheet: &sheets.AddSheetRequest{
+			Properties: &sheets.SheetProperties{
+				Title: sheetName,
+			},
+		},
+	}
+
+	rbb := &sheets.BatchUpdateSpreadsheetRequest{
+		Requests: []*sheets.Request{&req},
+	}
+
+	_, err := googleSheetService.Service.Spreadsheets.BatchUpdate(googleSheetService.SpreadsheetID, rbb).Context(context.Background()).Do()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 
 /* func readSheet() {

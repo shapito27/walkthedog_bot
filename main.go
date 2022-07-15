@@ -325,7 +325,7 @@ func main() {
 				lastMessage = donationCommand(bot, polls[update.PollAnswer.PollID])
 
 				//save to google sheet
-				srv, err := sheet.NewService()
+				/* srv, err := sheet.NewService()
 				if err != nil {
 					log.Fatalf(err.Error())
 				} else {
@@ -336,7 +336,9 @@ func main() {
 					if resp.ServerResponse.HTTPStatusCode != 200 {
 						log.Fatalf("error: %+v", resp)
 					}
-				}
+				} */
+				googleSpreadsheet := sheet.NewGoogleSpreadsheet(*config.Google)
+				googleSpreadsheet.CreateSheet("new test")
 			}
 		}
 		// save state to pool
