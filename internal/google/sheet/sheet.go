@@ -113,9 +113,7 @@ func NewService() (*sheets.Service, error) {
 }
 
 // SaveTripToShelter saves information about trip to google sheet.
-func SaveTripToShelter(srv *sheets.Service, tripToShelter *models.TripToShelter) (*sheets.AppendValuesResponse, error) {
-	spreadsheetId := "1sGRvjVEP4OvT4JubFmn9pp_h72vwO5aSHvZdUFoEFsY"
-
+func (googleSheetService googleSheet) SaveTripToShelter(sheetName string, tripToShelter *models.TripToShelter) (*sheets.AppendValuesResponse, error) {
 	var vr sheets.ValueRange
 	now := time.Now()
 	tripToShelterInfo := []interface{}{
@@ -130,9 +128,9 @@ func SaveTripToShelter(srv *sheets.Service, tripToShelter *models.TripToShelter)
 	}
 	vr.Values = append(vr.Values, tripToShelterInfo)
 
-	readRange := "Trips!A2:H"
+	readRange := fmt.Sprintf("%s!A2:H", sheetName)
 
-	return srv.Spreadsheets.Values.Append(spreadsheetId, readRange, &vr).ValueInputOption("RAW").Do()
+	return googleSheetService.Service.Spreadsheets.Values.Append(googleSheetService.SpreadsheetID, readRange, &vr).ValueInputOption("RAW").Do()
 }
 
 // CreateSheet creates sheet
@@ -153,6 +151,38 @@ func (googleSheetService googleSheet) CreateSheet(sheetName string) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+//AddSheetHeaders adds headers for new sheet
+func (googleSheetService googleSheet) AddSheetHeaders(sheetName string) {
+	//User	Приют	Дата	Первый раз	Цели	Как добирается	Откуда узнал	Дата регистрации на выезд (UTC +8)	Статус
+	var vr sheets.ValueRange
+	headers := []interface{}{
+		"User",
+		"Приют",
+		"Дата",
+		"Первый раз",
+		"Цели",
+		"Как добирается",
+		"Откуда узнал",
+		"Дата регистрации на выезд (UTC +8)",
+		"Статус",
+	}
+	vr.Values = append(vr.Values, headers)
+
+	readRange := fmt.Sprintf("%s!A1:I", sheetName)
+
+	_, err := googleSheetService.Service.Spreadsheets.Values.Append(googleSheetService.SpreadsheetID, readRange, &vr).ValueInputOption("RAW").Do()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// HasSheet checks is sheet exist
+func (googleSheetService googleSheet) HasSheet(sheetName string) bool {
+	_, err := googleSheetService.Service.Spreadsheets.Values.Get(googleSheetService.SpreadsheetID, fmt.Sprintf("%s!A1:B1", sheetName)).Do()
+
+	return err == nil
 }
 
 /* func readSheet() {

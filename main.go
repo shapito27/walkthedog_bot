@@ -183,6 +183,11 @@ func main() {
 			var msgObj tgbotapi.MessageConfig
 			//check for commands
 			switch update.Message.Text {
+			case "/sh":
+				//for testing
+				spew.Dump("start")
+				
+				spew.Dump("end")
 			case commandStart:
 				log.Println("[walkthedog_bot]: Send start message")
 				msgObj = startMessage(chatId)
@@ -257,7 +262,25 @@ func main() {
 						break
 					}
 					newTripToShelter.Shelter = shelter
+					if shelter.ID == "8" {
+						message := `<b>Зоотель "Лемур" находится в г. Воскресенск на юго-востоке от Москвы (80 км от МКАД по Новорязанское шоссе).</b>
+В этом районе нет приютов, а только стационары двух ветклиник. Здесь содержатся до 30 бездомных кошек и до 8 собак. Большинство имеют те или иные заболевания и травмы. В зоотеле животные проходят полный курс лечения и стерилизации. Вот примерная точка (https://yandex.ru/maps/-/CCUNFHxqCB) на город Воскресенск.
+						
+Мы сейчас не организуем групповые выезды туда, так как на передержке обычно немного собак, с которыми могло бы погулять большое количество людей. 
+						
+При этом любой человек может самостоятельно приехать в Лемур. Также в Лемуре стоит «Корзина добра» для сбора помощи бездомным животным Воскресенского района. 
+						 
+Приехать в Лемур можно в любой день с 10 до 18. 
+Перед тем как поехать - напишите нам в чат @walkthedog_lemur c датой когда хотите приехать (в ответ мы пришлем все детали).
+						
+Подробнее про Лемур: walkthedog.ru/lemur`
+						msgObj := tgbotapi.NewMessage(chatId, message)
 
+						msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+						msgObj.ParseMode = tgbotapi.ModeHTML
+						bot.Send(msgObj)
+						break
+					}
 					log.Println("[walkthedog_bot]: Send whichDate question")
 					msgObj = whichDate(chatId, shelter)
 					bot.Send(msgObj)
@@ -337,8 +360,23 @@ func main() {
 						log.Fatalf("error: %+v", resp)
 					}
 				} */
+
 				googleSpreadsheet := sheet.NewGoogleSpreadsheet(*config.Google)
-				googleSpreadsheet.CreateSheet("new test")
+				date := newTripToShelter.Date
+				
+				date = date[strings.Index(date, " ")+1:strings.Index(date, " ")+10]
+				sheetName := date + newTripToShelter.Shelter.ShortTitle
+				if !googleSpreadsheet.HasSheet(sheetName) {
+					googleSpreadsheet.CreateSheet(sheetName)
+					googleSpreadsheet.AddSheetHeaders(sheetName)
+				}
+				resp, err := googleSpreadsheet.SaveTripToShelter(sheetName, newTripToShelter)
+				if err != nil {
+					log.Fatalf("Unable to write data to sheet: %v", err)
+				}
+				if resp.ServerResponse.HTTPStatusCode != 200 {
+					log.Fatalf("error: %+v", resp)
+				}
 			}
 		}
 		// save state to pool
@@ -671,7 +709,20 @@ func getDatesByShelter(shelter *models.Shelter) []string {
 			if i == 0 && now.Day() > day.Day() {
 				continue
 			}
-			shedule = append(shedule, dates.WeekDaysRu[day.Weekday()]+" "+day.Format("02.01.2006")+" "+scheduleTime)
+			formatedDate := day.Format("02.01.2006")
+			isException := false
+			//check for exceptions
+			for _, v := range shelter.Schedule.DatesExceptions {
+				if v == formatedDate {
+					isException = true
+					break
+				}
+			}
+			if isException {
+				continue
+			}
+
+			shedule = append(shedule, dates.WeekDaysRu[day.Weekday()]+" "+formatedDate+" "+scheduleTime)
 
 		}
 	} else if shelter.Schedule.Type == "everyday" {
@@ -727,31 +778,20 @@ func howYouKnowAboutUs(chatId int64) tgbotapi.SendPollConfig {
 
 // summary returns object including message text with summary of user's answers and other message config.
 func summary(chatId int64, newTripToShelter *models.TripToShelter) tgbotapi.MessageConfig {
-	guide := `Место проведения: %s (точный адрес приюта отправляется в чат после регистрации)
-
-📎 За 5-7 дней до выезда мы пришлем вам ссылку для добавления в Whats App чат, где расскажем все детали и ответим на вопросы. До встречи!
-	`
-	if newTripToShelter.Shelter.Guide != "" {
-		guide = "Все детали о выезде в приют включая адрес, как доехать, что взять и потребности приюта: " + newTripToShelter.Shelter.Guide
-	} else {
-		guide = fmt.Sprintf(guide, newTripToShelter.Shelter.Address)
-	}
 	message := fmt.Sprintf(`Регистрация прошла успешно.
 	
 ℹ️ Информация о событии
 Выезд в приют: <a href="%s">%s</a>
 Дата и время: %s
-%s
 
 ❤️ Напоминаем, что участие в выезде в приют является бесплатным. При этом вы можете сделать добровольное пожертвование.
 
-💬 За 5 дней до выезда мы добавим вас в телеграм-чат выезда, где можно будет задать вопросы и уточнить о волонтерах, у кого будут места в машине.
+💬 За 5 дней до выезда мы добавим вас в чат, где можно будет узнать все детали о выезде в приют включая адрес, как доехать, что взять, потребности приюта и задать вопросы.
 
 Если у вас появятся вопросы до добавления в чат - пишите @walkthedog_support
 `, newTripToShelter.Shelter.Link,
 		newTripToShelter.Shelter.Title,
-		newTripToShelter.Date,
-		guide)
+		newTripToShelter.Date)
 	msgObj := tgbotapi.NewMessage(chatId, message)
 	msgObj.ParseMode = tgbotapi.ModeHTML
 

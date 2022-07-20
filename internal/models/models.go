@@ -7,6 +7,7 @@ type Shelter struct {
 	Address     string          `yaml:"address"`
 	DonateLink  string          `yaml:"donate_link"`
 	Title       string          `yaml:"title"`
+	ShortTitle  string          `yaml:"short_title"`
 	Link        string          `yaml:"link"`
 	Guide       string          `yaml:"guide"`
 	PeopleLimit int32           `yaml:"people_limit"`
