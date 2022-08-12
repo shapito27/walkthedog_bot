@@ -1,7 +1,7 @@
 telegram.yml
 app.yml
 Dockerfile
-readme.md
 credentials.json
 token.json
 walkthedog
+cache/cache.dat*
