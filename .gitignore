@@ -5,3 +5,4 @@ readme.md
 credentials.json
 token.json
 walkthedog
+cache/cache.dat*

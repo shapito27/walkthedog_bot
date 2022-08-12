@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -15,8 +16,17 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/patrickmn/go-cache"
 	"gopkg.in/yaml.v3"
 )
+
+type AppConfig struct {
+	Environment string
+	AdminChatId int64
+	Google      *models.Google
+	Cache       *cache.Cache
+	Bot         *tgbotapi.BotAPI
+}
 
 // Environments
 const (
@@ -47,8 +57,9 @@ const (
 	commandSummaryShelterTrip = "/summary_shelter_trip"
 
 	// System
-	commandRereadShelters  = "/reread_shelters"
-	commandRereadAppConfig = "/reread_app_config"
+	commandRereadShelters   = "/reread_shelters"
+	commandRereadConfigFile = "/reread_app_config"
+	commandUpdateGoogleAuth = "/update_google_auth"
 )
 
 // Answers
@@ -60,6 +71,11 @@ const (
 // Phrases
 const (
 	errorWrongShelterName = "не похоже на название приюта"
+)
+
+const (
+	cacheDir      = "cache/"
+	cacheFileName = "cache.dat"
 )
 
 // purposes represents list of available purposes user can choose to going to shelter.
@@ -112,20 +128,106 @@ func NewTripToShelter(userName string) *models.TripToShelter {
 	}
 }
 
+//var tempCacheFileName string
+var app AppConfig
+
 func main() {
+	/*
+			@TODO cache mechanism:
+			1. save to temp files. No need gob.Register!
+			2. no need second cache var "chats_have_trips" because each file cache comes from one session
+			3. if data sent to google sheet, then remove temprorary file
+			4. after app fall down, I need load files, sent to google sheet, remove temp file one by one.
+
+		-------------------------
+		No, not like this.
+		Because I have cache in memory. If app is not fall down I should restore data from inmemory cache.
+		In case app fall down I need store all value to file before:
+			- panic. How to catch example: @see https://stackoverflow.com/questions/55923271/how-to-write-to-the-console-before-a-function-panics
+															defer func() {
+																r := recover()
+																if r != nil {
+																	fmt.Println("Recovered", r)
+																}
+															}()
+
+															panic("panic here")
+			- manual app termination. https://stackoverflow.com/questions/37798572/exiting-go-applications-gracefully
+
+		So,
+			1. Add command send cached trips. When I got new token, need to reread cache and try to send data. If done clear from cache
+			2. I'll save Data to file before panic or exit
+				1) not sent trips details(from cache)
+				2) ids of not sent trips(from cache)
+				3) polls(memory)
+				4) statePool(memory)
+				5) not finished registration to the trip(memory)
+			3. Make it possible to restore data when start app
+			4.
+	*/
+
+	c, err := initCache()
+	if err != nil {
+		log.Panic(err)
+	}
+	app.Cache = c
+	/* trip := models.TripToShelter{
+		Username: "sdfsd908",
+		Shelter: &models.Shelter{
+			ID:          "2",
+			Address:     "sdfsdf",
+			DonateLink:  "sdfsdfsdf",
+			Title:       "bib",
+			ShortTitle:  "d",
+			Link:        "sdfsdfsdf",
+			Guide:       "sdfsdf",
+			PeopleLimit: 4,
+			Schedule: models.ShelterSchedule{
+				Type:            "sdfsdf",
+				Details:         []int{4, 54},
+				DatesExceptions: []string{"434", "sdf"},
+				TimeStart:       "1:1",
+				TimeEnd:         "34:5",
+			},
+		},
+		Date:              "3434",
+		IsFirstTrip:       true,
+		Purpose:           []string{"dfdfdf", "df"},
+		TripBy:            "dfdf",
+		HowYouKnowAboutUs: "dfdfdf",
+	} */
+	//c.Set("test", &trip, cache.NoExpiration)
+	/* saveTripToCache(c, &trip, 3453453453453) */
+	/* spew.Dump(c.Get("chats_have_trips"))
+	spew.Dump(c.Get("3453453453453")) */
+
+	/* c, err = initCache()
+	if err != nil {
+		log.Panic(err)
+	} */
+
+	//panic("end")
 	config, err := getConfig()
 	if err != nil {
 		log.Panic(err)
 	}
 
+	// @TODO remove curEnvironment var. Use app.Environment
 	curEnvironment := config.TelegramEnvironment.Environment
 	telegramConfig := config.TelegramEnvironment.TelegramConfig[curEnvironment]
 
+	app.Environment = curEnvironment
+	//app.Administration = config.Administration
+	app.Google = config.Google
+
+	// @TODO remove bot var. Use app.Bot
 	// bot init
 	bot, err := tgbotapi.NewBotAPI(telegramConfig.APIToken)
 	if err != nil {
 		log.Panic(err)
 	}
+
+	app.Bot = bot
 
 	if curEnvironment == developmentEnv {
 		bot.Debug = true
@@ -174,9 +276,22 @@ func main() {
 		newTripToShelter = state.TripToShelter
 		var isAdmin bool
 
+		var adminChatId int64 = 0
+		if config.Administration.Admin == "" {
+			log.Println("config.Administration.Admin is empty!")
+		} else {
+			adminChatIdTmp, err := strconv.Atoi(config.Administration.Admin)
+			if err != nil {
+				log.Println(err)
+			}
+			// @TODO remove adminChatId
+			adminChatId = int64(adminChatIdTmp)
+			app.AdminChatId = int64(adminChatIdTmp)
+		}
+
 		// If we got a message
 		if update.Message != nil {
-			isAdmin = update.Message.From.UserName == config.Administration.Admin
+			isAdmin = update.Message.Chat.ID == adminChatId
 			log.Printf("[%s]: %s", update.Message.From.UserName, update.Message.Text)
 			log.Printf("lastMessage: %s", lastMessage)
 
@@ -186,7 +301,7 @@ func main() {
 			case "/sh":
 				//for testing
 				spew.Dump("start")
-				
+
 				spew.Dump("end")
 			case commandStart:
 				log.Println("[walkthedog_bot]: Send start message")
@@ -225,14 +340,29 @@ func main() {
 					log.Println("[walkthedog_bot]: Shelters list was reread")
 					lastMessage = commandRereadShelters
 				}
-			case commandRereadAppConfig:
+			case commandRereadConfigFile:
 				if isAdmin {
 					config, err = getConfig()
 					if err != nil {
 						log.Panic(err)
 					}
 					log.Println("[walkthedog_bot]: App config was reread")
-					lastMessage = commandRereadAppConfig
+					lastMessage = commandRereadConfigFile
+				}
+			case commandUpdateGoogleAuth:
+				if isAdmin {
+					//googleSpreadsheet := sheet.NewGoogleSpreadsheet(*config.Google)
+
+					var message string
+					authURL, err := sheet.RequestAuthCodeURL()
+					if err != nil {
+						message = err.Error()
+					} else {
+						message = authURL + " \r\n Необходимо перейти по ссылке дать разрешения в гугле, после редиректа скопировать ссылку и отправить боту"
+					}
+					msgObj := tgbotapi.NewMessage(adminChatId, message)
+					bot.Send(msgObj)
+					lastMessage = commandUpdateGoogleAuth
 				}
 			default:
 				switch lastMessage {
@@ -241,11 +371,11 @@ func main() {
 						lastMessage = chooseShelterCommand(bot, &update, &shelters)
 					} else if update.Message.Text == chooseByDate {
 						//lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
-						ErrorFrontend(bot, &update, newTripToShelter, "Запись по Времени пока не доступна 😥")
+						ErrorFrontend(bot, &update, "Запись по Времени пока не доступна 😥")
 						lastMessage = goShelterCommand(bot, &update)
 						break
 					} else {
-						ErrorFrontend(bot, &update, newTripToShelter, fmt.Sprintf("Нажмите кноку \"%s\" или \"%s\"", chooseByDate, chooseByShelter))
+						ErrorFrontend(bot, &update, fmt.Sprintf("Нажмите кноку \"%s\" или \"%s\"", chooseByDate, chooseByShelter))
 						lastMessage = goShelterCommand(bot, &update)
 						break
 					}
@@ -257,7 +387,7 @@ func main() {
 					shelter, err := shelters.getShelterByNameID(update.Message.Text)
 
 					if err != nil {
-						ErrorFrontend(bot, &update, newTripToShelter, err.Error())
+						ErrorFrontend(bot, &update, err.Error())
 						chooseShelterCommand(bot, &update, &shelters)
 						break
 					}
@@ -289,13 +419,13 @@ func main() {
 					if isTripDateValid(update.Message.Text, newTripToShelter) {
 						lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
 					} else {
-						ErrorFrontend(bot, &update, newTripToShelter, "Кажется вы ошиблись с датой 🤔")
+						ErrorFrontend(bot, &update, "Кажется вы ошиблись с датой 🤔")
 						lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
 					}
 				case commandIsFirstTrip:
 					lastMessage, err = tripPurposeCommand(bot, &update, newTripToShelter)
 					if err != nil {
-						ErrorFrontend(bot, &update, newTripToShelter, err.Error())
+						ErrorFrontend(bot, &update, err.Error())
 						if isTripDateValid(update.Message.Text, newTripToShelter) {
 							lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
 						} else {
@@ -303,11 +433,42 @@ func main() {
 						}
 					}
 				case commandTripPurpose:
-					ErrorFrontend(bot, &update, newTripToShelter, "Выберите цели поездки и нажмите кнопку голосовать")
+					ErrorFrontend(bot, &update, "Выберите цели поездки и нажмите кнопку голосовать")
 				case commandTripBy:
-					ErrorFrontend(bot, &update, newTripToShelter, "Расскажите как добираетесь до приюта")
+					ErrorFrontend(bot, &update, "Расскажите как добираетесь до приюта")
 				case commandHowYouKnowAboutUs:
-					ErrorFrontend(bot, &update, newTripToShelter, "Расскажите как вы о нас узнали")
+					ErrorFrontend(bot, &update, "Расскажите как вы о нас узнали")
+				case commandUpdateGoogleAuth:
+					if isAdmin {
+						//extract code from url
+						u, err := url.Parse(update.Message.Text)
+						if err != nil {
+							lastMessage = ErrorFrontend(bot, &update, err.Error())
+							break
+						}
+						m, err := url.ParseQuery(u.RawQuery)
+						if err != nil {
+							lastMessage = ErrorFrontend(bot, &update, err.Error())
+							break
+						}
+						/* // @TODO send request for auth again (probably need to remove token.json first)
+						e := os.Remove("token.json")
+						if e != nil {
+							log.Fatal(e)
+						} */
+						// save new token by parsed auth code
+						err = sheet.AuthorizationCodeToToken(m["code"][0])
+						if err != nil {
+							lastMessage = ErrorFrontend(bot, &update, err.Error())
+							break
+						}
+						message := "G.Sheet токен авторизации обновлен"
+						msgObj := tgbotapi.NewMessage(adminChatId, message)
+						bot.Send(msgObj)
+
+						//@TODO try to send cached trips
+						app.sendCachedTripsToGSheet()
+					}
 				default:
 					log.Println("[walkthedog_bot]: Unknown command")
 
@@ -345,37 +506,29 @@ func main() {
 				}
 
 				summaryCommand(bot, &update, newTripToShelter)
-				lastMessage = donationCommand(bot, polls[update.PollAnswer.PollID])
+				chatId = polls[update.PollAnswer.PollID]
+				lastMessage = donationCommand(bot, chatId)
 
-				//save to google sheet
-				/* srv, err := sheet.NewService()
-				if err != nil {
-					log.Fatalf(err.Error())
-				} else {
-					resp, err := sheet.SaveTripToShelter(srv, newTripToShelter)
-					if err != nil {
-						log.Fatalf("Unable to write data from sheet: %v", err)
-					}
-					if resp.ServerResponse.HTTPStatusCode != 200 {
-						log.Fatalf("error: %+v", resp)
-					}
+				// generate uniq ID for trip to shelter
+				date := newTripToShelter.Date
+				date = date[strings.Index(date, " ")+1 : strings.Index(date, " ")+10]
+				newTripToShelter.ID = date + newTripToShelter.Shelter.ShortTitle
+
+				//@todo ask about name before saving to cache
+				// регистрация почти закончена. К сожалению мы не смогли получить вашего никнейма в телеграм, чтобы связаться с вами предоставте пожалуйста контактные данные:
+				// ник в телеграм, телефон, почта
+				/* if update.Message.From.UserName == "" {
+					askForNameCommand(bot, &update)
 				} */
 
-				googleSpreadsheet := sheet.NewGoogleSpreadsheet(*config.Google)
-				date := newTripToShelter.Date
-				
-				date = date[strings.Index(date, " ")+1:strings.Index(date, " ")+10]
-				sheetName := date + newTripToShelter.Shelter.ShortTitle
-				if !googleSpreadsheet.HasSheet(sheetName) {
-					googleSpreadsheet.CreateSheet(sheetName)
-					googleSpreadsheet.AddSheetHeaders(sheetName)
-				}
-				resp, err := googleSpreadsheet.SaveTripToShelter(sheetName, newTripToShelter)
-				if err != nil {
-					log.Fatalf("Unable to write data to sheet: %v", err)
-				}
-				if resp.ServerResponse.HTTPStatusCode != 200 {
-					log.Fatalf("error: %+v", resp)
+				app.saveTripToCache(newTripToShelter, chatId)
+
+				isTripSent := app.sendTripToGSheet(chatId, newTripToShelter)
+				if !isTripSent {
+					// send message to the admin. G.Sheet auth expired.
+					message := "G.Sheet auth expired."
+					msgObj := tgbotapi.NewMessage(app.AdminChatId, message)
+					app.Bot.Send(msgObj)
 				}
 			}
 		}
@@ -545,7 +698,7 @@ func (shelters SheltersList) getShelterByNameID(name string) (*models.Shelter, e
 }
 
 // ErrorFrontend sends error message to user and returns last command.
-func ErrorFrontend(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter, errMessage string) string {
+func ErrorFrontend(bot *tgbotapi.BotAPI, update *tgbotapi.Update, errMessage string) string {
 	log.Println("[walkthedog_bot]: Send ERROR")
 	if errMessage == "" {
 		errMessage = "Error"
@@ -556,18 +709,18 @@ func ErrorFrontend(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelt
 }
 
 // getConfig returns config by environment.
-func getConfig() (*models.AppConfig, error) {
+func getConfig() (*models.ConfigFile, error) {
 	yamlFile, err := ioutil.ReadFile("configs/app.yml")
 	if err != nil {
 		return nil, err
 	}
 
-	var appConfig models.AppConfig
-	err = yaml.Unmarshal(yamlFile, &appConfig)
+	var configFile models.ConfigFile
+	err = yaml.Unmarshal(yamlFile, &configFile)
 	if err != nil {
 		return nil, err
 	}
-	return &appConfig, nil
+	return &configFile, nil
 }
 
 // getShelters returns list of shelters with information about them.
@@ -836,4 +989,208 @@ func calculateDay(dayOfWeek int, week int, month time.Month) time.Time {
 	}
 
 	return time.Date(time.Now().Year(), month, resultDay, 0, 0, 0, 0, time.UTC)
+}
+
+// initCache init cache based on file or creates new.
+func initCache() (*cache.Cache, error) {
+	c := cache.New(5*time.Hour, 10*time.Hour)
+
+	err := c.LoadFile(cacheDir + cacheFileName)
+	if err != nil {
+		if err.Error() == "EOF" {
+			log.Println("Cache file is empty.")
+		} else {
+			log.Println(err.Error())
+		}
+	} else {
+		log.Println("cache from file")
+	}
+
+	return c, nil
+}
+
+// saveCacheToFile saves cache to file.
+func saveCacheToFile(cache *cache.Cache) error {
+	/* f, err := ioutil.TempFile(cacheDir, cacheFileName)
+	if err != nil {
+		return err
+		//t.Fatal("Couldn't create cache file:", err)
+	}
+	fname := f.Name()
+	tempCacheFileName = fname
+	f.Close()
+	err = cache.SaveFile(fname) */
+	err := cache.SaveFile(cacheDir + cacheFileName)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// saveTripToCache saves trip to cache.
+func (app *AppConfig) saveTripToCache(newTripToShelter *models.TripToShelter, chatId int64) {
+	//save newTripToShelter pointer to the object to the cache
+	app.Cache.Set(newTripToShelter.ID, *newTripToShelter, cache.NoExpiration)
+
+	// take all trips registrations that were not save to G.Sheets from cache
+	chatsWithTripsID := make(map[int64][]string)
+	chatsWithTripsIDFromCache, found := app.Cache.Get("chats_have_trips")
+	if found {
+		chatsWithTripsID = chatsWithTripsIDFromCache.(map[int64][]string)
+	}
+	// add new registration chat id
+	chatsWithTripsID[chatId] = append(chatsWithTripsID[chatId], newTripToShelter.ID)
+	// save to the cache
+	app.Cache.Set("chats_have_trips", chatsWithTripsID, cache.NoExpiration)
+	/*
+		no need, i'll save to file before panic or exit
+		err := saveCacheToFile(ca)
+		if err != nil {
+			log.Printf("Unable save Cache To File: %v", err)
+		} */
+}
+
+// removeTripFromCache removes trip from cache.
+func (app *AppConfig) removeTripFromCache(newTripToShelterId string, chatId int64) {
+	//delete newTripToShelter from cache by chatId
+	app.Cache.Delete(newTripToShelterId)
+
+	/* // take all trips registrations that were not save to G.Sheets from cache
+	var tripIds []int64
+	var tripIdsResult []string
+
+	tripIdsFromCache, found := app.Cache.Get("chats_have_trips")
+	if found {
+		tripIds = tripIdsFromCache.([]int64)
+	} */
+
+	var tripIdsResult []string
+	// remove trips from array
+	chatsWithTripsID := make(map[int64][]string)
+	chatsWithTripsIDFromCache, found := app.Cache.Get("chats_have_trips")
+	if found {
+		chatsWithTripsID = chatsWithTripsIDFromCache.(map[int64][]string)
+	}
+	tripsByChatId, ok := chatsWithTripsID[chatId]
+	// exit if don't have such a key in array
+	if !ok {
+		return
+	}
+	for i, v := range tripsByChatId {
+		if v == newTripToShelterId {
+			if len(tripsByChatId) == 1 {
+				// we need to delete trip from array by chat id and for this chat id only one trip exist. So remove chat id from map and underlying value.
+				delete(chatsWithTripsID, chatId)
+			} else {
+				tripIdsResult = append(tripIdsResult, tripsByChatId[:i]...)
+				tripIdsResult = append(tripIdsResult, tripsByChatId[i+1:]...)
+				chatsWithTripsID[chatId] = tripIdsResult
+			}
+			break
+		}
+	}
+	// save to the cache
+	app.Cache.Set("chats_have_trips", chatsWithTripsID, cache.NoExpiration)
+}
+
+// sendTextMessage sends message
+func sendTextMessage(bot *tgbotapi.BotAPI, chatId int64, message string) (tgbotapi.Message, error) {
+	msgObj := tgbotapi.NewMessage(chatId, message)
+	return bot.Send(msgObj)
+}
+
+// sendCachedTripsToGSheet
+func (app *AppConfig) sendCachedTripsToGSheet() {
+	chatsWithTripsID := make(map[int64][]string)
+	chatsWithTripsIDFromCache, found := app.Cache.Get("chats_have_trips")
+	if found {
+		chatsWithTripsID = chatsWithTripsIDFromCache.(map[int64][]string)
+	}
+	for chatId, TripsIDs := range chatsWithTripsID {
+		for _, v := range TripsIDs {
+			var tripToShelter models.TripToShelter
+			tripFromCache, found := app.Cache.Get(v)
+			if found {
+				tripToShelter = tripFromCache.(models.TripToShelter)
+			}
+			isTripSent := app.sendTripToGSheet(chatId, &tripToShelter)
+			if isTripSent {
+				log.Printf("Trip %s from cache sent to G.Sheet", tripToShelter.ID)
+				app.removeTripFromCache(tripToShelter.ID, chatId)
+			} else {
+				log.Println("Can't send trip to GSheet, so strop loop")
+				break
+			}
+		}
+	}
+
+	/* // try to find trip details by trip's id
+	for _, v := range tripIds {
+		//get newTripToShelter pointer
+		var tripToShelter *models.TripToShelter
+		tripToShelterFromCache, found := app.Cache.Get(fmt.Sprintf("%d", v))
+		if found {
+			tripToShelter = tripToShelterFromCache.(*models.TripToShelter)
+		}
+
+		isTripSent := app.sendTripToGSheet(v, tripToShelter)
+		if isTripSent {
+			app.removeTripFromCache(v)
+		} else {
+			log.Println("Can't send trip to GSheet, so strop loop")
+			break
+		}
+	} */
+}
+
+// sendTripToGSheet.
+func (app *AppConfig) sendTripToGSheet(chatId int64, newTripToShelter *models.TripToShelter) bool {
+	savingError := false
+	googleSpreadsheet, err := sheet.NewGoogleSpreadsheet(*app.Google)
+	if err != nil {
+		savingError = true
+		log.Printf("Unable to get sheet.NewGoogleSpreadsheet: %v", err)
+	}
+	/*
+		@INFO this code allows to save data to separate tab with
+		name of trip with following format: 13.08.2022Ника, 14.08.2022Шанс.
+		It checks if tab exists, it save it, otherwise it creates new tab.
+
+		date := newTripToShelter.Date
+
+		date = date[strings.Index(date, " ")+1 : strings.Index(date, " ")+10]
+		sheetName := date + newTripToShelter.Shelter.ShortTitle
+
+		if !savingError {
+			err := googleSpreadsheet.PrepareSheetForSavingData(sheetName)
+			if err != nil {
+				savingError = true
+				log.Printf("Unable to create sheet or add headers: %v", err)
+			}
+		}
+	*/
+
+	sheetName := "Trips"
+
+	if !savingError {
+		resp, err := googleSpreadsheet.SaveTripToShelter(sheetName, newTripToShelter)
+
+		if err != nil {
+			savingError = true
+			log.Printf("Unable to write data to sheet: %v", err)
+		}
+		if resp.ServerResponse.HTTPStatusCode != 200 {
+			savingError = true
+			log.Printf("Response status code is not 200: %+v", resp)
+		}
+	}
+
+	if !savingError {
+		// because trip was saved we need to remove it from cache.
+		app.removeTripFromCache(newTripToShelter.ID, chatId)
+		return true
+	} else {
+		return false
+	}
 }

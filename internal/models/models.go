@@ -25,6 +25,7 @@ type ShelterSchedule struct {
 
 // TripToShelter represents all important information about user's trip to shelter.
 type TripToShelter struct {
+	ID                string
 	Username          string
 	Shelter           *Shelter
 	Date              string
@@ -55,7 +56,7 @@ type Administration struct {
 type Google struct {
 	SpreadsheetID string `yaml:"spreadsheet_id"`
 }
-type AppConfig struct {
+type ConfigFile struct {
 	TelegramEnvironment *TelegramEnvironment `yaml:"telegram"`
 	Administration      *Administration      `yaml:"administration"`
 	Google              *Google              `yaml:"google"`
