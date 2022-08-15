@@ -54,6 +54,7 @@ const (
 	commandTripPurpose        = "/trip_purpose"
 	commandTripBy             = "/trip_by"
 	commandHowYouKnowAboutUs  = "/how_you_know_about_us"
+	commandSendUserContact    = "/provide_user_contact"
 	commandSummaryShelterTrip = "/summary_shelter_trip"
 
 	// System
@@ -212,34 +213,31 @@ func main() {
 		log.Panic(err)
 	}
 
-	// @TODO remove curEnvironment var. Use app.Environment
-	curEnvironment := config.TelegramEnvironment.Environment
-	telegramConfig := config.TelegramEnvironment.TelegramConfig[curEnvironment]
+	app.Environment = config.TelegramEnvironment.Environment
+	telegramConfig := config.TelegramEnvironment.TelegramConfig[app.Environment]
 
-	app.Environment = curEnvironment
+	/* app.Environment = curEnvironment */
 	//app.Administration = config.Administration
 	app.Google = config.Google
 
 	// @TODO remove bot var. Use app.Bot
 	// bot init
-	bot, err := tgbotapi.NewBotAPI(telegramConfig.APIToken)
+	app.Bot, err = tgbotapi.NewBotAPI(telegramConfig.APIToken)
 	if err != nil {
 		log.Panic(err)
 	}
 
-	app.Bot = bot
-
-	if curEnvironment == developmentEnv {
-		bot.Debug = true
+	if app.Environment == developmentEnv {
+		app.Bot.Debug = true
 	}
 
-	log.Printf("Authorized on account %s", bot.Self.UserName)
+	log.Printf("Authorized on account %s", app.Bot.Self.UserName)
 
 	// set how often check for updates
 	u := tgbotapi.NewUpdate(0)
 	u.Timeout = telegramConfig.Timeout
 
-	updates := bot.GetUpdatesChan(u)
+	updates := app.Bot.GetUpdatesChan(u)
 
 	var lastMessage string
 
@@ -307,27 +305,27 @@ func main() {
 				log.Println("[walkthedog_bot]: Send start message")
 				msgObj = startMessage(chatId)
 				msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-				bot.Send(msgObj)
+				app.Bot.Send(msgObj)
 				lastMessage = commandStart
 			case commandGoShelter:
 				log.Println("[walkthedog_bot]: Send appointmentOptionsMessage message")
-				lastMessage = goShelterCommand(bot, &update)
+				lastMessage = app.goShelterCommand(&update)
 			case commandChooseShelter:
-				lastMessage = chooseShelterCommand(bot, &update, &shelters)
+				lastMessage = app.chooseShelterCommand(&update, &shelters)
 			case commandTripDates:
-				lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
+				lastMessage = app.tripDatesCommand(&update, newTripToShelter, &shelters, lastMessage)
 			case commandMasterclass:
 				log.Println("[walkthedog_bot]: Send masterclass")
 				msgObj = masterclass(chatId)
-				bot.Send(msgObj)
+				app.Bot.Send(msgObj)
 				lastMessage = commandMasterclass
 			case commandDonation:
 				log.Println("[walkthedog_bot]: Send donation")
-				lastMessage = donationCommand(bot, chatId)
+				lastMessage = app.donationCommand(chatId)
 			case commandDonationShelterList:
 				log.Println("[walkthedog_bot]: Send donationShelterList")
 				msgObj = donationShelterList(chatId, &shelters)
-				bot.Send(msgObj)
+				app.Bot.Send(msgObj)
 				lastMessage = commandDonationShelterList
 			//system commands
 			case commandRereadShelters:
@@ -361,22 +359,22 @@ func main() {
 						message = authURL + " \r\n Необходимо перейти по ссылке дать разрешения в гугле, после редиректа скопировать ссылку и отправить боту"
 					}
 					msgObj := tgbotapi.NewMessage(adminChatId, message)
-					bot.Send(msgObj)
+					app.Bot.Send(msgObj)
 					lastMessage = commandUpdateGoogleAuth
 				}
 			default:
 				switch lastMessage {
 				case commandGoShelter:
 					if update.Message.Text == chooseByShelter {
-						lastMessage = chooseShelterCommand(bot, &update, &shelters)
+						lastMessage = app.chooseShelterCommand(&update, &shelters)
 					} else if update.Message.Text == chooseByDate {
-						//lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
-						ErrorFrontend(bot, &update, "Запись по Времени пока не доступна 😥")
-						lastMessage = goShelterCommand(bot, &update)
+						//lastMessage = tripDatesCommand(&update, newTripToShelter, &shelters, lastMessage)
+						app.ErrorFrontend(&update, "Запись по Времени пока не доступна 😥")
+						lastMessage = app.goShelterCommand(&update)
 						break
 					} else {
-						ErrorFrontend(bot, &update, fmt.Sprintf("Нажмите кноку \"%s\" или \"%s\"", chooseByDate, chooseByShelter))
-						lastMessage = goShelterCommand(bot, &update)
+						app.ErrorFrontend(&update, fmt.Sprintf("Нажмите кноку \"%s\" или \"%s\"", chooseByDate, chooseByShelter))
+						lastMessage = app.goShelterCommand(&update)
 						break
 					}
 				// when shelter was chosen next step to chose date
@@ -387,8 +385,8 @@ func main() {
 					shelter, err := shelters.getShelterByNameID(update.Message.Text)
 
 					if err != nil {
-						ErrorFrontend(bot, &update, err.Error())
-						chooseShelterCommand(bot, &update, &shelters)
+						app.ErrorFrontend(&update, err.Error())
+						app.chooseShelterCommand(&update, &shelters)
 						break
 					}
 					newTripToShelter.Shelter = shelter
@@ -408,47 +406,51 @@ func main() {
 
 						msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 						msgObj.ParseMode = tgbotapi.ModeHTML
-						bot.Send(msgObj)
+						app.Bot.Send(msgObj)
 						break
 					}
 					log.Println("[walkthedog_bot]: Send whichDate question")
 					msgObj = whichDate(chatId, shelter)
-					bot.Send(msgObj)
+					app.Bot.Send(msgObj)
 					lastMessage = commandChooseDates
 				case commandChooseDates:
 					if isTripDateValid(update.Message.Text, newTripToShelter) {
-						lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
+						lastMessage = app.isFirstTripCommand(&update, newTripToShelter)
 					} else {
-						ErrorFrontend(bot, &update, "Кажется вы ошиблись с датой 🤔")
-						lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
+						app.ErrorFrontend(&update, "Кажется вы ошиблись с датой 🤔")
+						lastMessage = app.tripDatesCommand(&update, newTripToShelter, &shelters, lastMessage)
 					}
 				case commandIsFirstTrip:
-					lastMessage, err = tripPurposeCommand(bot, &update, newTripToShelter)
+					lastMessage, err = app.tripPurposeCommand(&update, newTripToShelter)
 					if err != nil {
-						ErrorFrontend(bot, &update, err.Error())
+						app.ErrorFrontend(&update, err.Error())
 						if isTripDateValid(update.Message.Text, newTripToShelter) {
-							lastMessage = isFirstTripCommand(bot, &update, newTripToShelter)
+							lastMessage = app.isFirstTripCommand(&update, newTripToShelter)
 						} else {
-							lastMessage = tripDatesCommand(bot, &update, newTripToShelter, &shelters, lastMessage)
+							lastMessage = app.tripDatesCommand(&update, newTripToShelter, &shelters, lastMessage)
 						}
 					}
+				case commandSendUserContact:
+					// set username.
+					newTripToShelter.Username = update.Message.Text
+					app.registrationFinished(chatId, newTripToShelter)
 				case commandTripPurpose:
-					ErrorFrontend(bot, &update, "Выберите цели поездки и нажмите кнопку голосовать")
+					app.ErrorFrontend(&update, "Выберите цели поездки и нажмите кнопку голосовать")
 				case commandTripBy:
-					ErrorFrontend(bot, &update, "Расскажите как добираетесь до приюта")
+					app.ErrorFrontend(&update, "Расскажите как добираетесь до приюта")
 				case commandHowYouKnowAboutUs:
-					ErrorFrontend(bot, &update, "Расскажите как вы о нас узнали")
+					app.ErrorFrontend(&update, "Расскажите как вы о нас узнали")
 				case commandUpdateGoogleAuth:
 					if isAdmin {
 						//extract code from url
 						u, err := url.Parse(update.Message.Text)
 						if err != nil {
-							lastMessage = ErrorFrontend(bot, &update, err.Error())
+							lastMessage = app.ErrorFrontend(&update, err.Error())
 							break
 						}
 						m, err := url.ParseQuery(u.RawQuery)
 						if err != nil {
-							lastMessage = ErrorFrontend(bot, &update, err.Error())
+							lastMessage = app.ErrorFrontend(&update, err.Error())
 							break
 						}
 						/* // @TODO send request for auth again (probably need to remove token.json first)
@@ -459,12 +461,12 @@ func main() {
 						// save new token by parsed auth code
 						err = sheet.AuthorizationCodeToToken(m["code"][0])
 						if err != nil {
-							lastMessage = ErrorFrontend(bot, &update, err.Error())
+							lastMessage = app.ErrorFrontend(&update, err.Error())
 							break
 						}
 						message := "G.Sheet токен авторизации обновлен"
 						msgObj := tgbotapi.NewMessage(adminChatId, message)
-						bot.Send(msgObj)
+						app.Bot.Send(msgObj)
 
 						//@TODO try to send cached trips
 						app.sendCachedTripsToGSheet()
@@ -474,7 +476,7 @@ func main() {
 
 					message := "Не понимаю 🐶 Попробуй " + commandStart
 					msgObj := tgbotapi.NewMessage(chatId, message)
-					bot.Send(msgObj)
+					app.Bot.Send(msgObj)
 					lastMessage = commandChooseDates
 				}
 			}
@@ -492,44 +494,26 @@ func main() {
 					newTripToShelter.Purpose = append(newTripToShelter.Purpose, purposes[option])
 				}
 
-				lastMessage = tripByCommand(bot, &update, newTripToShelter)
+				lastMessage = app.tripByCommand(&update, newTripToShelter)
 			case commandTripBy:
 				for _, option := range update.PollAnswer.OptionIDs {
 					newTripToShelter.TripBy = tripByOptions[option]
 					break
 				}
-				lastMessage = howYouKnowAboutUsCommand(bot, &update, newTripToShelter)
+				lastMessage = app.howYouKnowAboutUsCommand(&update, newTripToShelter)
 			case commandHowYouKnowAboutUs:
 				for _, option := range update.PollAnswer.OptionIDs {
 					newTripToShelter.HowYouKnowAboutUs = sources[option]
 					break
 				}
 
-				summaryCommand(bot, &update, newTripToShelter)
-				chatId = polls[update.PollAnswer.PollID]
-				lastMessage = donationCommand(bot, chatId)
-
-				// generate uniq ID for trip to shelter
-				date := newTripToShelter.Date
-				date = date[strings.Index(date, " ")+1 : strings.Index(date, " ")+10]
-				newTripToShelter.ID = date + newTripToShelter.Shelter.ShortTitle
-
-				//@todo ask about name before saving to cache
-				// регистрация почти закончена. К сожалению мы не смогли получить вашего никнейма в телеграм, чтобы связаться с вами предоставте пожалуйста контактные данные:
-				// ник в телеграм, телефон, почта
-				/* if update.Message.From.UserName == "" {
-					askForNameCommand(bot, &update)
-				} */
-
-				app.saveTripToCache(newTripToShelter, chatId)
-
-				isTripSent := app.sendTripToGSheet(chatId, newTripToShelter)
-				if !isTripSent {
-					// send message to the admin. G.Sheet auth expired.
-					message := "G.Sheet auth expired."
-					msgObj := tgbotapi.NewMessage(app.AdminChatId, message)
-					app.Bot.Send(msgObj)
+				// if user dont set username
+				if update.PollAnswer.User.UserName == "" {
+					lastMessage = app.askForContactCommand(polls[update.PollAnswer.PollID])
+					break
 				}
+
+				app.registrationFinished(chatId, newTripToShelter)
 			}
 		}
 		// save state to pool
@@ -541,25 +525,25 @@ func main() {
 }
 
 // goShelterCommand prepares message about available options to start appointment to shelter and then sends it and returns last command.
-func goShelterCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update) string {
+func (app *AppConfig) goShelterCommand(update *tgbotapi.Update) string {
 	msgObj := appointmentOptionsMessage(update.Message.Chat.ID)
-	bot.Send(msgObj)
+	app.Bot.Send(msgObj)
 	return commandGoShelter
 }
 
 // chooseShelterCommand prepares message about available shelters and then sends it and returns last command.
-func chooseShelterCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, shelters *SheltersList) string {
+func (app *AppConfig) chooseShelterCommand(update *tgbotapi.Update, shelters *SheltersList) string {
 	log.Println("[walkthedog_bot]: Send whichShelter question")
 	msgObj := whichShelter(update.Message.Chat.ID, shelters)
-	bot.Send(msgObj)
+	app.Bot.Send(msgObj)
 	return commandChooseShelter
 }
 
 // isFirstTripCommand prepares message with question "is your first trip?" and then sends it and returns last command.
-func isFirstTripCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
+func (app *AppConfig) isFirstTripCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
 	newTripToShelter.Date = update.Message.Text
 	msgObj := isFirstTrip(update.Message.Chat.ID)
-	bot.Send(msgObj)
+	app.Bot.Send(msgObj)
 	return commandIsFirstTrip
 }
 
@@ -585,7 +569,7 @@ func isTripDateValid(date string, newTripToShelter *models.TripToShelter) bool {
 }
 
 // tripPurposeCommand prepares poll with question about your purpose for this trip and then sends it and returns last command.
-func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) (string, error) {
+func (app *AppConfig) tripPurposeCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) (string, error) {
 	if update.Message.Text == "Да" {
 		newTripToShelter.IsFirstTrip = true
 	} else if update.Message.Text == "Нет" {
@@ -596,7 +580,7 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 
 	msgObj := tripPurpose(update.Message.Chat.ID)
 
-	responseMessage, err := bot.Send(msgObj)
+	responseMessage, err := app.Bot.Send(msgObj)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -606,9 +590,9 @@ func tripPurposeCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripTo
 }
 
 // tripByCommand prepares poll with question about how he going to come to shelter and then sends it and returns last command.
-func tripByCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
+func (app *AppConfig) tripByCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
 	msgObj := tripBy(polls[update.PollAnswer.PollID])
-	responseMessage, err := bot.Send(msgObj)
+	responseMessage, err := app.Bot.Send(msgObj)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -617,14 +601,14 @@ func tripByCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelt
 }
 
 // howYouKnowAboutUsCommand prepares poll with question about where did you know about us and then sends it and returns last command.
-func howYouKnowAboutUsCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
+func (app *AppConfig) howYouKnowAboutUsCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
 	msgObj := howYouKnowAboutUs(polls[update.PollAnswer.PollID])
-	responseMessage, err := bot.Send(msgObj)
+	responseMessage, err := app.Bot.Send(msgObj)
 
 	if err != nil {
 		//@TODO if i got error here I don't have chat id in response(but have PollAnswer.PollID and PollAnswer.User). So need to get chat id and display error that bot is broken.
 		log.Fatalln(err)
-		/* ErrorFrontend(bot, update, newTripToShelter, "У бота временные проблемы 😥")
+		/* app.ErrorFrontend(update, newTripToShelter, "У бота временные проблемы 😥")
 		return commandError */
 	}
 
@@ -633,25 +617,25 @@ func howYouKnowAboutUsCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, new
 }
 
 // summaryCommand prepares message with summary and then sends it and returns last command.
-func summaryCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
-	msgObj := summary(polls[update.PollAnswer.PollID], newTripToShelter)
-	bot.Send(msgObj)
+func (app *AppConfig) summaryCommand(chatId int64, newTripToShelter *models.TripToShelter) string {
+	msgObj := summary(chatId, newTripToShelter)
+	app.Bot.Send(msgObj)
 	return commandSummaryShelterTrip
 }
 
 // donationCommand prepares message with availabele ways to dontate us or shelters and then sends it and returns last command.
-func donationCommand(bot *tgbotapi.BotAPI, chatId int64) string {
+func (app *AppConfig) donationCommand(chatId int64) string {
 	msgObj := donation(chatId)
-	bot.Send(msgObj)
+	app.Bot.Send(msgObj)
 	return commandDonation
 }
 
 // tripDatesCommand prepares message with availabele dates to go to shelters and then sends it and returns last command.
-func tripDatesCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToShelter *models.TripToShelter, shelters *SheltersList, lastMessage string) string {
+func (app *AppConfig) tripDatesCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter, shelters *SheltersList, lastMessage string) string {
 	if newTripToShelter == nil {
 		message := "По времени записаться пока нельзя :("
 		msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, message)
-		bot.Send(msgObj)
+		app.Bot.Send(msgObj)
 		return commandGoShelter
 		/* newTripToShelter = NewTripToShelter(update.Message.From.UserName)
 		if lastMessage == commandChooseShelter {
@@ -659,8 +643,8 @@ func tripDatesCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToSh
 			shelter, err := shelters.getShelterByNameID(update.Message.Text)
 
 			if err != nil {
-				ErrorFrontend(bot, update, newTripToShelter, err.Error())
-				chooseShelterCommand(bot, update, shelters)
+				app.ErrorFrontend(update, newTripToShelter, err.Error())
+				chooseShelterCommand(update, shelters)
 			}
 			newTripToShelter.Shelter = shelter
 		} else if lastMessage == commandGoShelter {
@@ -669,8 +653,15 @@ func tripDatesCommand(bot *tgbotapi.BotAPI, update *tgbotapi.Update, newTripToSh
 	}
 	log.Println("[walkthedog_bot]: Send whichDate question")
 	msgObj := whichDate(update.Message.Chat.ID, newTripToShelter.Shelter)
-	bot.Send(msgObj)
+	app.Bot.Send(msgObj)
 	return commandChooseDates
+}
+
+// askForContactCommand prepares message with question about user contact and returns last command.
+func (app *AppConfig) askForContactCommand(chatId int64) string {
+	msgObj := askContact(chatId)
+	app.Bot.Send(msgObj)
+	return commandSendUserContact
 }
 
 // getShelterByNameID returns Shelter and error using given shelter name in following format:
@@ -698,13 +689,13 @@ func (shelters SheltersList) getShelterByNameID(name string) (*models.Shelter, e
 }
 
 // ErrorFrontend sends error message to user and returns last command.
-func ErrorFrontend(bot *tgbotapi.BotAPI, update *tgbotapi.Update, errMessage string) string {
+func (app *AppConfig) ErrorFrontend(update *tgbotapi.Update, errMessage string) string {
 	log.Println("[walkthedog_bot]: Send ERROR")
 	if errMessage == "" {
 		errMessage = "Error"
 	}
 	msgObj := errorMessage(update.Message.Chat.ID, errMessage)
-	bot.Send(msgObj)
+	app.Bot.Send(msgObj)
 	return commandError
 }
 
@@ -807,7 +798,7 @@ func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 
 	for i := 1; i <= len(*shelters); i++ {
 		buttonRow := tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(fmt.Sprintf("%s. %s", (*shelters)[i].ID, (*shelters)[i].Title)),
+			tgbotapi.NewKeyboardButton(fmt.Sprintf("%s. %s", (*shelters)[i].ID, (*shelters)[i].LongTitle)),
 		)
 
 		sheltersButtons = append(sheltersButtons, buttonRow)
@@ -970,6 +961,43 @@ func donation(chatId int64) tgbotapi.MessageConfig {
 	return msgObj
 }
 
+// askContact returns object including message text with summary of user's answers and other message config.
+func askContact(chatId int64) tgbotapi.MessageConfig {
+	message := fmt.Sprintf(`Регистрация почти завершена 👍
+
+Но мы не можем определить ваше имя пользователя Телеграм. 
+Пожалуйста напишите в следующем сообщении email или номер телефона, чтобы мы смогли добавить вас в чат выезда в приют.
+
+Если возникли проблемы напишите нам @walkthedog_support
+`)
+	msgObj := tgbotapi.NewMessage(chatId, message)
+	msgObj.ParseMode = tgbotapi.ModeHTML
+
+	return msgObj
+}
+
+func (app *AppConfig) registrationFinished(chatId int64, newTripToShelter *models.TripToShelter) string {
+	app.summaryCommand(chatId, newTripToShelter)
+	lastMessage := app.donationCommand(chatId)
+
+	// generate uniq ID for trip to shelter
+	date := newTripToShelter.Date
+	date = date[strings.Index(date, " ")+1 : strings.Index(date, " ")+10]
+	newTripToShelter.ID = date + newTripToShelter.Shelter.ShortTitle
+
+	app.saveTripToCache(newTripToShelter, chatId)
+
+	isTripSent := app.sendTripToGSheet(chatId, newTripToShelter)
+	if !isTripSent {
+		// send message to the admin. G.Sheet auth expired.
+		message := "G.Sheet auth expired."
+		msgObj := tgbotapi.NewMessage(app.AdminChatId, message)
+		app.Bot.Send(msgObj)
+	}
+
+	return lastMessage
+}
+
 // calculateDay returns the date of by given day of week, week number and month.
 func calculateDay(dayOfWeek int, week int, month time.Month) time.Time {
 	firstDayOfMonth := time.Date(time.Now().Year(), month, 1, 0, 0, 0, 0, time.UTC)
@@ -1095,9 +1123,9 @@ func (app *AppConfig) removeTripFromCache(newTripToShelterId string, chatId int6
 }
 
 // sendTextMessage sends message
-func sendTextMessage(bot *tgbotapi.BotAPI, chatId int64, message string) (tgbotapi.Message, error) {
+func (app *AppConfig) sendTextMessage(chatId int64, message string) (tgbotapi.Message, error) {
 	msgObj := tgbotapi.NewMessage(chatId, message)
-	return bot.Send(msgObj)
+	return app.Bot.Send(msgObj)
 }
 
 // sendCachedTripsToGSheet
