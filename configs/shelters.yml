@@ -32,7 +32,7 @@
     time_end: "13:00"
 3:
   id: 3
-  title: "\"Шанс\" (Save Husky, Щелково)"
+  title: "\"Шанс\" (Щелково)"
   long_title: "\"Шанс\" (Save Husky, Щелково) (2-ое воскресенье месяца)"
   short_title: "Шанс"
   address: "Московская область, Щелково"
@@ -50,7 +50,7 @@
   id: 4
   title: "\"Домашний\" (Балашиха)"
   long_title: "\"Домашний\" (Балашиха) (3-ья суббота месяца)"
-  short_title: "Домашний"
+  short_title: "ДомашнийБ"
   address: "Московская область, Балашиха"
   link: "https://walkthedog.ru/domashniy_balashikha"
   donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"
@@ -82,7 +82,7 @@
   id: 6
   title: "\"Домашний\" (м. Аннино)"
   long_title: "\"Домашний\" (м. Аннино) (4-ая суббота месяца)"
-  short_title: "Домашний"
+  short_title: "ДомашнийА"
   address: ""
   link: "https://walkthedog.ru/domashniy_annino"
   donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"

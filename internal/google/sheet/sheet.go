@@ -197,6 +197,23 @@ func (googleSheetService googleSheet) SaveTripToShelter(sheetName string, tripTo
 	return googleSheetService.Service.Spreadsheets.Values.Append(googleSheetService.SpreadsheetID, readRange, &vr).ValueInputOption("RAW").Do()
 }
 
+// SaveTripToShelter saves information about trip in short format to System sheet to google sheet.
+func (googleSheetService googleSheet) SaveTripToShelterSystem(sheetName string, tripToShelter *models.TripToShelter) (*sheets.AppendValuesResponse, error) {
+	var vr sheets.ValueRange
+	now := time.Now()
+	tripToShelterInfo := []interface{}{
+		tripToShelter.Username,
+		tripToShelter.Shelter.ShortTitle,
+		tripToShelter.Date,
+		now.Format("02.01.2006 15:04:05"),
+	}
+	vr.Values = append(vr.Values, tripToShelterInfo)
+
+	readRange := fmt.Sprintf("%s!A1:D", sheetName)
+
+	return googleSheetService.Service.Spreadsheets.Values.Append(googleSheetService.SpreadsheetID, readRange, &vr).ValueInputOption("RAW").Do()
+}
+
 // CreateSheet creates sheet.
 func (googleSheetService googleSheet) CreateSheet(sheetName string) (*sheets.BatchUpdateSpreadsheetResponse, error) {
 	req := sheets.Request{

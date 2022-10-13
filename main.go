@@ -46,16 +46,17 @@ const (
 	commandDonationShelterList = "/donation_shelter_list"
 
 	// Related to Shelter trip process
-	commandGoShelter          = "/go_shelter"
-	commandChooseShelter      = "/choose_shelter"
-	commandTripDates          = "/trip_dates"
-	commandChooseDates        = "/choose_date"
-	commandIsFirstTrip        = "/is_first_trip"
-	commandTripPurpose        = "/trip_purpose"
-	commandTripBy             = "/trip_by"
-	commandHowYouKnowAboutUs  = "/how_you_know_about_us"
-	commandSendUserContact    = "/provide_user_contact"
-	commandSummaryShelterTrip = "/summary_shelter_trip"
+	commandGoShelter              = "/go_shelter"
+	commandChooseShelter          = "/choose_shelter"
+	commandTripDates              = "/trip_dates"
+	commandChooseDateAfterShelter = "/choose_date_after_shelter"
+	commandChooseDateAfterMonth   = "/choose_date_after_month"
+	commandIsFirstTrip            = "/is_first_trip"
+	commandTripPurpose            = "/trip_purpose"
+	commandTripBy                 = "/trip_by"
+	commandHowYouKnowAboutUs      = "/how_you_know_about_us"
+	commandSendUserContact        = "/provide_user_contact"
+	commandSummaryShelterTrip     = "/summary_shelter_trip"
 
 	// System
 	commandRereadShelters   = "/reread_shelters"
@@ -110,6 +111,22 @@ var sources = []string{
 	"Мосволонтер",
 	"Знаю вас уже давно",
 	"Другой вариант",
+}
+
+// months.
+var months = []string{
+	"Январь",
+	"Февраль",
+	"Март",
+	"Апрель",
+	"Май",
+	"Июнь",
+	"Июль",
+	"Август",
+	"Сентябрь",
+	"Октябрь",
+	"Ноябрь",
+	"Декабрь",
 }
 
 // statePool store all chat states
@@ -220,7 +237,6 @@ func main() {
 	//app.Administration = config.Administration
 	app.Google = config.Google
 
-	// @TODO remove bot var. Use app.Bot
 	// bot init
 	app.Bot, err = tgbotapi.NewBotAPI(telegramConfig.APIToken)
 	if err != nil {
@@ -368,12 +384,26 @@ func main() {
 					if update.Message.Text == chooseByShelter {
 						lastMessage = app.chooseShelterCommand(&update, &shelters)
 					} else if update.Message.Text == chooseByDate {
-						//lastMessage = tripDatesCommand(&update, newTripToShelter, &shelters, lastMessage)
-						app.ErrorFrontend(&update, "Запись по Времени пока не доступна 😥")
-						lastMessage = app.goShelterCommand(&update)
+						lastMessage = app.tripByDateAvailableMonthesCommand(&update, newTripToShelter, &shelters, lastMessage)
 						break
 					} else {
-						app.ErrorFrontend(&update, fmt.Sprintf("Нажмите кноку \"%s\" или \"%s\"", chooseByDate, chooseByShelter))
+						itsMonth := false
+						curMonth := time.Now().Month()
+						//check if it's month
+						for i, v := range months {
+							if i+1 < int(curMonth) {
+								continue
+							}
+							if update.Message.Text == v {
+								lastMessage = app.tripByDateAvailableDatesByMonthCommand(&update, newTripToShelter, &shelters, lastMessage, i)
+								itsMonth = true
+							}
+						}
+						if itsMonth {
+							break
+						}
+
+						app.ErrorFrontend(&update, "Кажется вы ошиблись с месяцем 🤔 Давайте попробуем заново")
 						lastMessage = app.goShelterCommand(&update)
 						break
 					}
@@ -412,20 +442,48 @@ func main() {
 					log.Println("[walkthedog_bot]: Send whichDate question")
 					msgObj = whichDate(chatId, shelter)
 					app.Bot.Send(msgObj)
-					lastMessage = commandChooseDates
-				case commandChooseDates:
+					lastMessage = commandChooseDateAfterShelter
+				case commandChooseDateAfterShelter:
 					if isTripDateValid(update.Message.Text, newTripToShelter) {
-						lastMessage = app.isFirstTripCommand(&update, newTripToShelter)
+						lastMessage = app.isFirstTripCommand(update.Message.Text, update.Message.Chat.ID, newTripToShelter)
 					} else {
 						app.ErrorFrontend(&update, "Кажется вы ошиблись с датой 🤔")
 						lastMessage = app.tripDatesCommand(&update, newTripToShelter, &shelters, lastMessage)
+					}
+				case commandChooseDateAfterMonth:
+					splitString := strings.Split(update.Message.Text, ",")
+					if len(splitString) < 2 {
+						app.ErrorFrontend(&update, "Кажется вы ошиблись с датой 🤔 Давайте попробуем заново")
+						lastMessage = app.goShelterCommand(&update)
+						break
+					}
+					shelter := strings.TrimSpace(splitString[1])
+					date := strings.TrimSpace(splitString[0])
+
+					if newTripToShelter == nil {
+						newTripToShelter = NewTripToShelter(update.Message.From.UserName)
+					}
+
+					for _, v := range shelters {
+						//spew.Dump(v.Title, dateAndShelter[1])
+						if v.Title == shelter {
+							newTripToShelter.Shelter = v
+							break
+						}
+					}
+					//spew.Dump(newTripToShelter)
+					if isTripDateValid(date, newTripToShelter) {
+						lastMessage = app.isFirstTripCommand(date, update.Message.Chat.ID, newTripToShelter)
+					} else {
+						app.ErrorFrontend(&update, "Кажется вы ошиблись с датой 🤔 Давайте попробуем заново")
+						lastMessage = app.goShelterCommand(&update)
 					}
 				case commandIsFirstTrip:
 					lastMessage, err = app.tripPurposeCommand(&update, newTripToShelter)
 					if err != nil {
 						app.ErrorFrontend(&update, err.Error())
 						if isTripDateValid(update.Message.Text, newTripToShelter) {
-							lastMessage = app.isFirstTripCommand(&update, newTripToShelter)
+							lastMessage = app.isFirstTripCommand(update.Message.Text, update.Message.Chat.ID, newTripToShelter)
 						} else {
 							lastMessage = app.tripDatesCommand(&update, newTripToShelter, &shelters, lastMessage)
 						}
@@ -477,7 +535,7 @@ func main() {
 					message := "Не понимаю 🐶 Попробуй " + commandStart
 					msgObj := tgbotapi.NewMessage(chatId, message)
 					app.Bot.Send(msgObj)
-					lastMessage = commandChooseDates
+					lastMessage = commandChooseDateAfterShelter
 				}
 			}
 		} else if update.Poll != nil {
@@ -539,10 +597,26 @@ func (app *AppConfig) chooseShelterCommand(update *tgbotapi.Update, shelters *Sh
 	return commandChooseShelter
 }
 
+// tripByDateAvailableMonthesCommand prepares message about available monthes for trip by date and then sends it and returns last command.
+func (app *AppConfig) tripByDateAvailableMonthesCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter, shelters *SheltersList, lastMessage string) string {
+	log.Println("[walkthedog_bot]: Send whichMonth question")
+	msgObj := whichMonth(update.Message.Chat.ID)
+	app.Bot.Send(msgObj)
+	return commandGoShelter
+}
+
+// tripByDateAvailableDatesByMonthCommand prepares message about available monthes for trip by date and then sends it and returns last command.
+func (app *AppConfig) tripByDateAvailableDatesByMonthCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter, shelters *SheltersList, lastMessage string, monthIndex int) string {
+	log.Println("[walkthedog_bot]: Send whichDateByMonth question")
+	msgObj := whichDateByMonth(update.Message.Chat.ID, shelters, monthIndex)
+	app.Bot.Send(msgObj)
+	return commandChooseDateAfterMonth
+}
+
 // isFirstTripCommand prepares message with question "is your first trip?" and then sends it and returns last command.
-func (app *AppConfig) isFirstTripCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
-	newTripToShelter.Date = update.Message.Text
-	msgObj := isFirstTrip(update.Message.Chat.ID)
+func (app *AppConfig) isFirstTripCommand(message string, chatID int64, newTripToShelter *models.TripToShelter) string {
+	newTripToShelter.Date = message
+	msgObj := isFirstTrip(chatID)
 	app.Bot.Send(msgObj)
 	return commandIsFirstTrip
 }
@@ -637,24 +711,11 @@ func (app *AppConfig) tripDatesCommand(update *tgbotapi.Update, newTripToShelter
 		msgObj := tgbotapi.NewMessage(update.Message.Chat.ID, message)
 		app.Bot.Send(msgObj)
 		return commandGoShelter
-		/* newTripToShelter = NewTripToShelter(update.Message.From.UserName)
-		if lastMessage == commandChooseShelter {
-			panic("change it if I use it")
-			shelter, err := shelters.getShelterByNameID(update.Message.Text)
-
-			if err != nil {
-				app.ErrorFrontend(update, newTripToShelter, err.Error())
-				chooseShelterCommand(update, shelters)
-			}
-			newTripToShelter.Shelter = shelter
-		} else if lastMessage == commandGoShelter {
-
-		} */
 	}
 	log.Println("[walkthedog_bot]: Send whichDate question")
 	msgObj := whichDate(update.Message.Chat.ID, newTripToShelter.Shelter)
 	app.Bot.Send(msgObj)
-	return commandChooseDates
+	return commandChooseDateAfterShelter
 }
 
 // askForContactCommand prepares message with question about user contact and returns last command.
@@ -809,6 +870,53 @@ func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 	return msgObj
 }
 
+// whichMonth returns message with question "Which month are you going to go" and button options.
+func whichMonth(chatId int64) tgbotapi.MessageConfig {
+	//ask about
+	message := "Выберите месяц поездки в приют?"
+	msgObj := tgbotapi.NewMessage(chatId, message)
+
+	curMonth := time.Now().Month()
+
+	var sheltersButtons [][]tgbotapi.KeyboardButton
+
+	for i := 0; i < len(months); i++ {
+		if i+1 < int(curMonth) {
+			continue
+		}
+		buttonRow := tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(months[i]),
+		)
+
+		sheltersButtons = append(sheltersButtons, buttonRow)
+	}
+	var numericKeyboard = tgbotapi.NewReplyKeyboard(sheltersButtons...)
+	msgObj.ReplyMarkup = numericKeyboard
+	return msgObj
+}
+
+// whichDateByMonth returns message with question "Which date are you going to go" and button options.
+func whichDateByMonth(chatId int64, shelters *SheltersList, monthIndex int) tgbotapi.MessageConfig {
+	//ask about
+	message := "Выберите дату поездки в приют?"
+	msgObj := tgbotapi.NewMessage(chatId, message)
+
+	var numericKeyboard tgbotapi.ReplyKeyboardMarkup
+	var dateButtons [][]tgbotapi.KeyboardButton
+
+	shelterDates := getDatesByMonth(monthIndex, shelters)
+	for _, value := range shelterDates {
+		buttonRow := tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton(value),
+		)
+		dateButtons = append(dateButtons, buttonRow)
+	}
+	numericKeyboard = tgbotapi.NewReplyKeyboard(dateButtons...)
+
+	msgObj.ReplyMarkup = numericKeyboard
+	return msgObj
+}
+
 // whichShelter returns message with question "Which Shelter you want go" and button options.
 func errorMessage(chatId int64, message string) tgbotapi.MessageConfig {
 	msgObj := tgbotapi.NewMessage(chatId, message)
@@ -871,6 +979,46 @@ func getDatesByShelter(shelter *models.Shelter) []string {
 		}
 	} else if shelter.Schedule.Type == "everyday" {
 		//TODO: finish everyday type
+	}
+
+	return shedule
+}
+
+// getDatesByMonth return list of dates by month for all shelters.
+func getDatesByMonth(monthIndex int, shelters *SheltersList) []string {
+	var shedule []string
+	now := time.Now()
+
+	for _, shelter := range *shelters {
+
+		if shelter.Schedule.Type == "regularly" {
+
+			scheduleWeek := shelter.Schedule.Details[0]
+			scheduleDay := shelter.Schedule.Details[1]
+			scheduleTime := shelter.Schedule.TimeStart
+
+			month := time.Month(monthIndex + 1)
+			day := calculateDay(scheduleDay, scheduleWeek, month)
+			if month == now.Month() && now.Day() > day.Day() {
+				continue
+			}
+			formatedDate := day.Format("02.01.2006")
+			isException := false
+			//check for exceptions
+			for _, v := range shelter.Schedule.DatesExceptions {
+				if v == formatedDate {
+					isException = true
+					break
+				}
+			}
+			if isException {
+				continue
+			}
+
+			shedule = append(shedule, dates.WeekDaysRu[day.Weekday()]+" "+formatedDate+" "+scheduleTime+", "+shelter.Title)
+		} else if shelter.Schedule.Type == "everyday" {
+			//TODO: finish everyday type
+		}
 	}
 
 	return shedule
@@ -1201,10 +1349,23 @@ func (app *AppConfig) sendTripToGSheet(chatId int64, newTripToShelter *models.Tr
 		}
 	*/
 
-	sheetName := "Trips"
+	sheetName := newTripToShelter.Shelter.ShortTitle
 
 	if !savingError {
 		resp, err := googleSpreadsheet.SaveTripToShelter(sheetName, newTripToShelter)
+
+		if err != nil {
+			savingError = true
+			log.Printf("Unable to write data to sheet: %v", err)
+		}
+		if resp.ServerResponse.HTTPStatusCode != 200 {
+			savingError = true
+			log.Printf("Response status code is not 200: %+v", resp)
+		}
+
+		sheetName := "System"
+		// save to system table
+		resp, err = googleSpreadsheet.SaveTripToShelterSystem(sheetName, newTripToShelter)
 
 		if err != nil {
 			savingError = true

@@ -7,7 +7,7 @@ When you signed up it send your answers to google sheet. This data will helps to
 Run bot 
 =
 
-```go run *.go```
+```go run main.go```
 
 Run tests
 =
