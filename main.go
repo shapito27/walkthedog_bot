@@ -561,8 +561,7 @@ func main() {
 				lastMessage = app.howYouKnowAboutUsCommand(&update, newTripToShelter)
 			case commandHowYouKnowAboutUs:
 				for _, option := range update.PollAnswer.OptionIDs {
-					newTripToShelter.HowYouKnowAboutUs = sources[option]
-					break
+					newTripToShelter.HowYouKnowAboutUs = append(newTripToShelter.HowYouKnowAboutUs, sources[option])
 				}
 
 				// if user dont set username
@@ -873,7 +872,7 @@ func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 // whichMonth returns message with question "Which month are you going to go" and button options.
 func whichMonth(chatId int64) tgbotapi.MessageConfig {
 	//ask about
-	message := "Выберите месяц поездки в приют?"
+	message := "Выберите месяц поездки в приют"
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	curMonth := time.Now().Month()
@@ -898,7 +897,7 @@ func whichMonth(chatId int64) tgbotapi.MessageConfig {
 // whichDateByMonth returns message with question "Which date are you going to go" and button options.
 func whichDateByMonth(chatId int64, shelters *SheltersList, monthIndex int) tgbotapi.MessageConfig {
 	//ask about
-	message := "Выберите дату поездки в приют?"
+	message := "Выберите дату поездки в приют"
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
 	var numericKeyboard tgbotapi.ReplyKeyboardMarkup
@@ -1063,8 +1062,9 @@ func howYouKnowAboutUs(chatId int64) tgbotapi.SendPollConfig {
 	message := "🤫 Как вы о нас узнали?"
 	options := sources
 	msgObj := tgbotapi.NewPoll(chatId, message, options...)
+	msgObj.AllowsMultipleAnswers = true
 	msgObj.IsAnonymous = false
-	msgObj.AllowsMultipleAnswers = false
+	msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(false)
 	return msgObj
 }
 

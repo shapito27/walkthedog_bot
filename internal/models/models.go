@@ -33,7 +33,7 @@ type TripToShelter struct {
 	IsFirstTrip       bool
 	Purpose           []string
 	TripBy            string
-	HowYouKnowAboutUs string
+	HowYouKnowAboutUs []string
 }
 
 // State represents state of chat with user

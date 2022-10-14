@@ -187,7 +187,7 @@ func (googleSheetService googleSheet) SaveTripToShelter(sheetName string, tripTo
 		strconv.FormatBool(tripToShelter.IsFirstTrip),
 		strings.Join(tripToShelter.Purpose, ","),
 		tripToShelter.TripBy,
-		tripToShelter.HowYouKnowAboutUs,
+		strings.Join(tripToShelter.HowYouKnowAboutUs, ","),
 		now.Format("02.01.2006 15:04:05"),
 	}
 	vr.Values = append(vr.Values, tripToShelterInfo)
