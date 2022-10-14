@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -985,7 +986,10 @@ func getDatesByShelter(shelter *models.Shelter) []string {
 
 // getDatesByMonth return list of dates by month for all shelters.
 func getDatesByMonth(monthIndex int, shelters *SheltersList) []string {
-	var shedule []string
+	// shedules stores shelters shedule where key is date + shelter id
+	var shedules = make(map[int]string)
+	// sortedKeys we need for sorting shedules by keys.
+	var sortedKeys []int
 	now := time.Now()
 
 	for _, shelter := range *shelters {
@@ -1013,11 +1017,25 @@ func getDatesByMonth(monthIndex int, shelters *SheltersList) []string {
 			if isException {
 				continue
 			}
-
-			shedule = append(shedule, dates.WeekDaysRu[day.Weekday()]+" "+formatedDate+" "+scheduleTime+", "+shelter.Title)
+			// index is date + shelter id. ID needs for prevent case when several trips for same date.
+			index, err := strconv.Atoi(day.Format("20060102") + shelter.ID)
+			if err != nil {
+				log.Println("Can't convert date to int")
+				continue
+			}
+			sortedKeys = append(sortedKeys, index)
+			shedules[index] = dates.WeekDaysRu[day.Weekday()] + " " + formatedDate + " " + scheduleTime + ", " + shelter.Title
 		} else if shelter.Schedule.Type == "everyday" {
 			//TODO: finish everyday type
 		}
+	}
+	// sorting dates.
+	sort.Ints(sortedKeys)
+
+	var shedule []string
+	// build final slice of shedule sorted by date.
+	for _, value := range sortedKeys {
+		shedule = append(shedule, shedules[value])
 	}
 
 	return shedule
