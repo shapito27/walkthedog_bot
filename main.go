@@ -389,12 +389,8 @@ func main() {
 						break
 					} else {
 						itsMonth := false
-						curMonth := time.Now().Month()
 						//check if it's month
 						for i, v := range months {
-							if i+1 < int(curMonth) {
-								continue
-							}
 							if update.Message.Text == v {
 								lastMessage = app.tripByDateAvailableDatesByMonthCommand(&update, newTripToShelter, &shelters, lastMessage, i)
 								itsMonth = true
@@ -876,22 +872,30 @@ func whichMonth(chatId int64) tgbotapi.MessageConfig {
 	message := "Выберите месяц поездки в приют"
 	msgObj := tgbotapi.NewMessage(chatId, message)
 
+	howManyMonthsDisplay := 6
 	curMonth := time.Now().Month()
+	monthIndex := int(curMonth) - 1
 
 	var sheltersButtons [][]tgbotapi.KeyboardButton
 
-	for i := 0; i < len(months); i++ {
-		if i+1 < int(curMonth) {
-			continue
+	for i := 0; i < howManyMonthsDisplay; i++ {
+
+		fmt.Println(monthIndex)
+		if monthIndex == len(months) {
+			monthIndex = 0
 		}
+
 		buttonRow := tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton(months[i]),
+			tgbotapi.NewKeyboardButton(months[monthIndex]),
 		)
 
 		sheltersButtons = append(sheltersButtons, buttonRow)
+		monthIndex = monthIndex + 1
 	}
+
 	var numericKeyboard = tgbotapi.NewReplyKeyboard(sheltersButtons...)
 	msgObj.ReplyMarkup = numericKeyboard
+
 	return msgObj
 }
 
@@ -1168,7 +1172,11 @@ func (app *AppConfig) registrationFinished(chatId int64, newTripToShelter *model
 
 // calculateDay returns the date of by given day of week, week number and month.
 func calculateDay(dayOfWeek int, week int, month time.Month) time.Time {
-	firstDayOfMonth := time.Date(time.Now().Year(), month, 1, 0, 0, 0, 0, time.UTC)
+	year := time.Now().Year()
+	if month < time.Now().Month() {
+		year = time.Now().Year() + 1
+	}
+	firstDayOfMonth := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
 	//currentDay := (8 - int(firstDayOfMonth.Weekday())) % 7
 
 	currentDay := int(firstDayOfMonth.Weekday())
@@ -1184,7 +1192,7 @@ func calculateDay(dayOfWeek int, week int, month time.Month) time.Time {
 		resultDay = 1 + (7 - currentDay + dayOfWeek) + (week-1)*7
 	}
 
-	return time.Date(time.Now().Year(), month, resultDay, 0, 0, 0, 0, time.UTC)
+	return time.Date(year, month, resultDay, 0, 0, 0, 0, time.UTC)
 }
 
 // initCache init cache based on file or creates new.
