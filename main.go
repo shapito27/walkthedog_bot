@@ -63,6 +63,7 @@ const (
 	commandRereadShelters   = "/reread_shelters"
 	commandRereadConfigFile = "/reread_app_config"
 	commandUpdateGoogleAuth = "/update_google_auth"
+	commandClearCache = "/clear_cache"
 )
 
 // Answers
@@ -378,6 +379,15 @@ func main() {
 					msgObj := tgbotapi.NewMessage(adminChatId, message)
 					app.Bot.Send(msgObj)
 					lastMessage = commandUpdateGoogleAuth
+				}
+			case commandClearCache:
+				if isAdmin {
+					// send cached trips first
+					app.sendCachedTripsToGSheet()
+					// clear cache
+					app.Cache.Flush()
+					log.Println("[walkthedog_bot]: Cache was cleared")
+					lastMessage = commandClearCache
 				}
 			default:
 				switch lastMessage {

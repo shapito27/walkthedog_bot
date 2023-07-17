@@ -146,8 +146,10 @@ func equalTripsToShelters(trip1 *models.TripToShelter, trip2 *models.TripToShelt
 	if trip1.Username != trip2.Username {
 		error = fmt.Sprintf("Username is not equal. Expected \"%s\", got \"%s\"", trip1.Username, trip2.Username)
 	}
-	if trip1.HowYouKnowAboutUs != trip2.HowYouKnowAboutUs {
-		error = fmt.Sprintf("HowYouKnowAboutUs is not equal. Expected \"%s\", got \"%s\"", trip1.HowYouKnowAboutUs, trip2.HowYouKnowAboutUs)
+	for i, v := range trip1.HowYouKnowAboutUs {
+		if v != trip2.HowYouKnowAboutUs[i] {
+			error = fmt.Sprintf("HowYouKnowAboutUs is not equal. Expected \"%s\", got \"%s\"", trip1.HowYouKnowAboutUs[i], trip2.HowYouKnowAboutUs[i])
+		}
 	}
 	if trip1.TripBy != trip2.TripBy {
 		error = fmt.Sprintf("TripBy is not equal. Expected \"%s\", got \"%s\"", trip1.TripBy, trip2.TripBy)
@@ -194,7 +196,7 @@ func getTripsToSheltersList() []*models.TripToShelter {
 		IsFirstTrip:       true,
 		Purpose:           []string{"dfdfdf", "df"},
 		TripBy:            "dfdf",
-		HowYouKnowAboutUs: "dfdfdf",
+		HowYouKnowAboutUs: []string{"youtube", "fb"},
 	})
 
 	list = append(list, &models.TripToShelter{
@@ -221,7 +223,7 @@ func getTripsToSheltersList() []*models.TripToShelter {
 		IsFirstTrip:       true,
 		Purpose:           []string{"dfdfdf", "df"},
 		TripBy:            "dfdf",
-		HowYouKnowAboutUs: "dfdfdf",
+		HowYouKnowAboutUs: []string{"youtube", "fb"},
 	})
 
 	return list

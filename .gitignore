@@ -1,7 +1,7 @@
 telegram.yml
 app.yml
-Dockerfile
 credentials.json
 token.json
 walkthedog
 cache/cache.dat*
+help.md

@@ -96,6 +96,22 @@
     time_end: "13:00"
 7:
   id: 7
+  title: "Велес (Пушкинский район)"
+  long_title: "Велес (Пушкинский район) (4-ая суббота месяца)"
+  short_title: "Велес"
+  address: "Московская область городской округ Пушкинский село Рахманово"
+  link: "https://walkthedog.ru/veles"
+  donate_link: "https://www.tinkoff.ru/cf/AEYjBrWvqNY"
+  guide: ""
+  people_limit: 30
+  schedule:
+    type: "regularly"
+    details: [4, 6]
+    dates_exceptions: []
+    time_start: "11:00"
+    time_end: "13:00"
+8:
+  id: 8
   title: "\"Мокрый нос\" (Зеленоград)"
   long_title: "\"Мокрый нос\" (Зеленоград) (4-ое воскресенье месяца)"
   short_title: "Мокрый"
@@ -110,8 +126,8 @@
     dates_exceptions: []
     time_start: "11:00"
     time_end: "13:00"
-8:
-  id: 8
+9:
+  id: 9
   title: "\"Лемур\" (Воскресенск)"
   long_title: "\"Лемур\" (Воскресенск)"
   short_title: "Лемур"
