@@ -5,9 +5,9 @@ run_app:
 docker/build:
 	docker build -t walkthedog_image .
 docker/create_container:
-	docker run -d --name walkthedog_bot walkthedog_image
+	docker run -d --name walkthedog_bot -v $PWD:/go/src/app walkthedog_image
 docker/remove_container:
-	-docker container rm walkthedog_bot
+	docker container rm walkthedog_bot
 docker/container/start:
 	docker container start walkthedog_bot
 docker/container/stop:
