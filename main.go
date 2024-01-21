@@ -3,9 +3,9 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/url"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -63,7 +63,7 @@ const (
 	commandRereadShelters   = "/reread_shelters"
 	commandRereadConfigFile = "/reread_app_config"
 	commandUpdateGoogleAuth = "/update_google_auth"
-	commandClearCache = "/clear_cache"
+	commandClearCache       = "/clear_cache"
 )
 
 // Answers
@@ -134,7 +134,7 @@ var months = []string{
 // statePool store all chat states
 var statePool = make(map[int64]*models.State)
 
-//TODO: remove poll_id after answer.
+// TODO: remove poll_id after answer.
 // polls stores poll_id => chat_id
 var polls = make(map[string]int64)
 
@@ -148,44 +148,10 @@ func NewTripToShelter(userName string) *models.TripToShelter {
 	}
 }
 
-//var tempCacheFileName string
+// var tempCacheFileName string
 var app AppConfig
 
 func main() {
-	/*
-			@TODO cache mechanism:
-			1. save to temp files. No need gob.Register!
-			2. no need second cache var "chats_have_trips" because each file cache comes from one session
-			3. if data sent to google sheet, then remove temprorary file
-			4. after app fall down, I need load files, sent to google sheet, remove temp file one by one.
-
-		-------------------------
-		No, not like this.
-		Because I have cache in memory. If app is not fall down I should restore data from inmemory cache.
-		In case app fall down I need store all value to file before:
-			- panic. How to catch example: @see https://stackoverflow.com/questions/55923271/how-to-write-to-the-console-before-a-function-panics
-															defer func() {
-																r := recover()
-																if r != nil {
-																	fmt.Println("Recovered", r)
-																}
-															}()
-
-															panic("panic here")
-			- manual app termination. https://stackoverflow.com/questions/37798572/exiting-go-applications-gracefully
-
-		So,
-			1. Add command send cached trips. When I got new token, need to reread cache and try to send data. If done clear from cache
-			2. I'll save Data to file before panic or exit
-				1) not sent trips details(from cache)
-				2) ids of not sent trips(from cache)
-				3) polls(memory)
-				4) statePool(memory)
-				5) not finished registration to the trip(memory)
-			3. Make it possible to restore data when start app
-			4.
-	*/
-
 	c, err := initCache()
 	if err != nil {
 		log.Panic(err)
@@ -427,7 +393,7 @@ func main() {
 						break
 					}
 					newTripToShelter.Shelter = shelter
-					if shelter.ID == "8" {
+					if shelter.ID == "10" {
 						message := `<b>Зоотель "Лемур" находится в г. Воскресенск на юго-востоке от Москвы (80 км от МКАД по Новорязанское шоссе).</b>
 В этом районе нет приютов, а только стационары двух ветклиник. Здесь содержатся до 30 бездомных кошек и до 8 собак. Большинство имеют те или иные заболевания и травмы. В зоотеле животные проходят полный курс лечения и стерилизации. Вот примерная точка (https://yandex.ru/maps/-/CCUNFHxqCB) на город Воскресенск.
 						
@@ -446,6 +412,17 @@ func main() {
 						app.Bot.Send(msgObj)
 						break
 					}
+/* 					// check if no trips dates
+					if !isShelterHasTripDates(shelter) {
+						message := `Прию`
+												msgObj := tgbotapi.NewMessage(chatId, message)
+						
+												msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+												msgObj.ParseMode = tgbotapi.ModeHTML
+												app.Bot.Send(msgObj)
+												break
+					} */
+
 					log.Println("[walkthedog_bot]: Send whichDate question")
 					msgObj = whichDate(chatId, shelter)
 					app.Bot.Send(msgObj)
@@ -648,6 +625,11 @@ func isTripDateValid(date string, newTripToShelter *models.TripToShelter) bool {
 	return isCorrectDate
 }
 
+// isShelterHasTripDates return true if shelter has available dates of trips.
+func isShelterHasTripDates(shelter *models.Shelter) bool {
+	return shelter.Schedule.Type != "none"
+}
+
 // tripPurposeCommand prepares poll with question about your purpose for this trip and then sends it and returns last command.
 func (app *AppConfig) tripPurposeCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) (string, error) {
 	if update.Message.Text == "Да" {
@@ -768,7 +750,7 @@ func (app *AppConfig) ErrorFrontend(update *tgbotapi.Update, errMessage string) 
 
 // getConfig returns config by environment.
 func getConfig() (*models.ConfigFile, error) {
-	yamlFile, err := ioutil.ReadFile("configs/app.yml")
+	yamlFile, err := os.ReadFile("configs/app.yml")
 	if err != nil {
 		return nil, err
 	}
@@ -783,16 +765,26 @@ func getConfig() (*models.ConfigFile, error) {
 
 // getShelters returns list of shelters with information about them.
 func getShelters() (SheltersList, error) {
-	yamlFile, err := ioutil.ReadFile("configs/shelters.yml")
-	if err != nil {
-		return nil, err
-	}
-	var sheltersList SheltersList
-	err = yaml.Unmarshal(yamlFile, &sheltersList)
+	yamlFile, err := os.ReadFile("configs/shelters.yml")
 	if err != nil {
 		return nil, err
 	}
 
+	var sheltersListYAML map[string][]*models.Shelter
+	err = yaml.Unmarshal(yamlFile, &sheltersListYAML)
+	if err != nil {
+		return nil, err
+	}
+
+	var sheltersList = make(map[int]*models.Shelter)
+	for _, value := range sheltersListYAML["shelters"] {
+		id, err := strconv.Atoi(value.ID)
+		if err != nil {
+			log.Println("Can't convert ID to int")
+			continue
+		}
+		sheltersList[id] = value
+	}
 	return sheltersList, nil
 }
 
@@ -864,6 +856,9 @@ func whichShelter(chatId int64, shelters *SheltersList) tgbotapi.MessageConfig {
 	log.Println("shelters before range", shelters)
 
 	for i := 1; i <= len(*shelters); i++ {
+		if !isShelterHasTripDates((*shelters)[i]) {
+			continue
+		}
 		buttonRow := tgbotapi.NewKeyboardButtonRow(
 			tgbotapi.NewKeyboardButton(fmt.Sprintf("%s. %s", (*shelters)[i].ID, (*shelters)[i].LongTitle)),
 		)
@@ -961,38 +956,58 @@ func whichDate(chatId int64, shelter *models.Shelter) tgbotapi.MessageConfig {
 
 // getDatesByShelter return list of dates.
 func getDatesByShelter(shelter *models.Shelter) []string {
+	// shedules stores shelters shedule where key is date + shelter id. It needs for temprorary store dates to sort them later.
+	var shedules = make(map[int]string)
+	// sortedKeys we need for sorting shedules by keys.
+	var sortedKeys []int
 	var shedule []string
 	now := time.Now()
 	spew.Dump(shelter)
 	if shelter.Schedule.Type == "regularly" {
-
-		scheduleWeek := shelter.Schedule.Details[0]
-		scheduleDay := shelter.Schedule.Details[1]
-		scheduleTime := shelter.Schedule.TimeStart
-		for i := 0; i < 6; i++ {
-			month := time.Month(int(now.Month()) + i)
-			day := calculateDay(scheduleDay, scheduleWeek, month)
-			if i == 0 && now.Day() > day.Day() {
-				continue
-			}
-			formatedDate := day.Format("02.01.2006")
-			isException := false
-			//check for exceptions
-			for _, v := range shelter.Schedule.DatesExceptions {
-				if v == formatedDate {
-					isException = true
-					break
+		var trips = shelter.Schedule.Details
+		for _, tripDate := range trips {
+			scheduleWeek := tripDate[0]
+			scheduleDay := tripDate[1]
+			scheduleTime := shelter.Schedule.TimeStart
+			for i := 0; i < 6; i++ {
+				month := time.Month(int(now.Month()) + i)
+				day := calculateDay(scheduleDay, scheduleWeek, month)
+				if i == 0 && now.Day() > day.Day() {
+					continue
 				}
-			}
-			if isException {
-				continue
-			}
+				formatedDate := day.Format("02.01.2006")
+				isException := false
+				//check for exceptions
+				for _, v := range shelter.Schedule.DatesExceptions {
+					if v == formatedDate {
+						isException = true
+						break
+					}
+				}
+				if isException {
+					continue
+				}
 
-			shedule = append(shedule, dates.WeekDaysRu[day.Weekday()]+" "+formatedDate+" "+scheduleTime)
+				index, err := strconv.Atoi(day.Format("20060102"))
+				if err != nil {
+					log.Println("Can't convert date to int")
+					continue
+				}
+				sortedKeys = append(sortedKeys, index)
+				shedules[index] = dates.WeekDaysRu[day.Weekday()] + " " + formatedDate + " " + scheduleTime
+			}
+		}
+		// sorting dates.
+		sort.Ints(sortedKeys)
 
+		// build final slice of shedule sorted by date.
+		for _, value := range sortedKeys {
+			shedule = append(shedule, shedules[value])
 		}
 	} else if shelter.Schedule.Type == "everyday" {
 		//TODO: finish everyday type
+	} else if shelter.Schedule.Type == "none" {
+		// do nothing
 	}
 
 	return shedule
@@ -1000,7 +1015,7 @@ func getDatesByShelter(shelter *models.Shelter) []string {
 
 // getDatesByMonth return list of dates by month for all shelters.
 func getDatesByMonth(monthIndex int, shelters *SheltersList) []string {
-	// shedules stores shelters shedule where key is date + shelter id
+	// shedules stores shelters shedule where key is date + shelter id. It needs for temprorary store dates to sort them later.
 	var shedules = make(map[int]string)
 	// sortedKeys we need for sorting shedules by keys.
 	var sortedKeys []int
@@ -1009,38 +1024,42 @@ func getDatesByMonth(monthIndex int, shelters *SheltersList) []string {
 	for _, shelter := range *shelters {
 
 		if shelter.Schedule.Type == "regularly" {
+			var trips = shelter.Schedule.Details
+			for _, tripDate := range trips {
+				scheduleWeek := tripDate[0]
+				scheduleDay := tripDate[1]
+				scheduleTime := shelter.Schedule.TimeStart
 
-			scheduleWeek := shelter.Schedule.Details[0]
-			scheduleDay := shelter.Schedule.Details[1]
-			scheduleTime := shelter.Schedule.TimeStart
-
-			month := time.Month(monthIndex + 1)
-			day := calculateDay(scheduleDay, scheduleWeek, month)
-			if month == now.Month() && now.Day() > day.Day() {
-				continue
-			}
-			formatedDate := day.Format("02.01.2006")
-			isException := false
-			//check for exceptions
-			for _, v := range shelter.Schedule.DatesExceptions {
-				if v == formatedDate {
-					isException = true
-					break
+				month := time.Month(monthIndex + 1)
+				day := calculateDay(scheduleDay, scheduleWeek, month)
+				if month == now.Month() && now.Day() > day.Day() {
+					continue
 				}
+				formatedDate := day.Format("02.01.2006")
+				isException := false
+				//check for exceptions
+				for _, v := range shelter.Schedule.DatesExceptions {
+					if v == formatedDate {
+						isException = true
+						break
+					}
+				}
+				if isException {
+					continue
+				}
+				// index is date + shelter id. ID needs for prevent case when several trips for same date.
+				index, err := strconv.Atoi(day.Format("20060102") + shelter.ID)
+				if err != nil {
+					log.Println("Can't convert date to int")
+					continue
+				}
+				sortedKeys = append(sortedKeys, index)
+				shedules[index] = dates.WeekDaysRu[day.Weekday()] + " " + formatedDate + " " + scheduleTime + ", " + shelter.Title
 			}
-			if isException {
-				continue
-			}
-			// index is date + shelter id. ID needs for prevent case when several trips for same date.
-			index, err := strconv.Atoi(day.Format("20060102") + shelter.ID)
-			if err != nil {
-				log.Println("Can't convert date to int")
-				continue
-			}
-			sortedKeys = append(sortedKeys, index)
-			shedules[index] = dates.WeekDaysRu[day.Weekday()] + " " + formatedDate + " " + scheduleTime + ", " + shelter.Title
 		} else if shelter.Schedule.Type == "everyday" {
 			//TODO: finish everyday type
+		} else if shelter.Schedule.Type == "none" {
+			// do nothing
 		}
 	}
 	// sorting dates.

@@ -18,7 +18,7 @@ type Shelter struct {
 // ShelterSchedule represents trips shedule to shelters
 type ShelterSchedule struct {
 	Type            string   `yaml:"type"`
-	Details         []int    `yaml:"details"`
+	Details         [][]int    `yaml:"details"`
 	DatesExceptions []string `yaml:"dates_exceptions"`
 	TimeStart       string   `yaml:"time_start"`
 	TimeEnd         string   `yaml:"time_end"`

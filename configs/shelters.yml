@@ -1,160 +1,151 @@
-1:
-  id: 1
-  title: "Хаски Хелп (Истра)"
-  long_title: "Хаски Хелп (Истра) (1-ая суббота месяца)"
-  short_title: "Хаски"
-  address: "Московская область, городской округ Истра, деревня Карцево"
-  link: "https://walkthedog.ru/huskyhelp"
-  donate_link: "https://www.tinkoff.ru/sl/1msxKU5XTyS"
-  guide: "https://docs.google.com/document/d/1ywdrkhIetPEK3-pBFwysDFBslxQ7QBzsb9b95hxEh_k/"
-  people_limit: 50
-  schedule:
-    type: "regularly"
-    details: [1, 6]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-2:
-  id: 2
-  title: "Дубовая роща (Москва)"
-  long_title: "Дубовая роща (Москва) (1-ая суббота месяца)"
-  short_title: "Дубовая"
-  address: "г. Москва, м. Телецентр"
-  link: "https://walkthedog.ru/dubovaya"
-  donate_link: "https://www.tinkoff.ru/cf/72xLdsZQp6"
-  guide: ""
-  people_limit: 30
-  schedule:
-    type: "regularly"
-    details: [1, 6]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-3:
-  id: 3
-  title: "\"Ника\" (Зеленоград)"
-  long_title: "\"Ника\" (Зеленоград) (2-ая суббота месяца)"
-  short_title: "Ника"
-  address: "г. Зеленоград"
-  link: "https://walkthedog.ru/nika"
-  donate_link: "https://www.tinkoff.ru/sl/A3izVb5Cyzn"
-  guide: "https://docs.google.com/document/d/1w9bOj_fuELO246nvHqwW8rb9qJ2I61R6lKQactHC8JQ/edit?usp=sharing"
-  people_limit: 30
-  schedule:
-    type: "regularly"
-    details: [2, 6]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-4:
-  id: 4
-  title: "\"Шанс\" (Щелково)"
-  long_title: "\"Шанс\" (Save Husky, Щелково) (2-ое воскресенье месяца)"
-  short_title: "Шанс"
-  address: "Московская область, Щелково"
-  link: "https://walkthedog.ru/savehusky"
-  donate_link: "https://www.tinkoff.ru/cf/5OrkCaUBo5D"
-  guide: ""
-  people_limit: 20
-  schedule:
-    type: "regularly"
-    details: [2, 7]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-5:
-  id: 5
-  title: "\"Домашний\" (Балашиха)"
-  long_title: "\"Домашний\" (Балашиха) (3-ья суббота месяца)"
-  short_title: "ДомашнийБ"
-  address: "Московская область, Балашиха"
-  link: "https://walkthedog.ru/domashniy_balashikha"
-  donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"
-  guide: "https://docs.google.com/document/d/13ERK_jKTfoJvHZxIb8MQjleZWZVsbNmmoVUMYh-gPeA/edit"
-  people_limit: 30
-  schedule:
-    type: "regularly"
-    details: [3, 6]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-6:
-  id: 6
-  title: "Биозона (Воскресенск)"
-  long_title: "Биозона (Воскресенск) (3-ья суббота месяца)"
-  short_title: "Биозона"
-  address: "пгт Белоозерский, Воскресенский район Московской области"
-  link: "https://walkthedog.ru/biozona"
-  donate_link: "https://www.tinkoff.ru/sl/AG2GLNF5aun"
-  guide: "https://docs.google.com/document/d/1exL74Apb3mrQFOl4r4zYEiE1W4wNJpbXTPTqPpWE8TI/edit"
-  people_limit: 25
-  schedule:
-    type: "regularly"
-    details: [3, 6]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-7:
-  id: 7
-  title: "\"Домашний\" (м. Аннино)"
-  long_title: "\"Домашний\" (м. Аннино) (4-ая суббота месяца)"
-  short_title: "ДомашнийА"
-  address: ""
-  link: "https://walkthedog.ru/domashniy_annino"
-  donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"
-  guide: "https://docs.google.com/document/d/1GtKQAg21rUzDzG_1i9bDrZ6I67v9qgV_noQCIk8b8cc/edit"
-  people_limit: 30
-  schedule:
-    type: "regularly"
-    details: [4, 6]
-    dates_exceptions: ['23.07.2022', '24.09.2022', '26.11.2022']
-    time_start: "11:00"
-    time_end: "13:00"
-8:
-  id: 8
-  title: "Велес (Пушкинский район)"
-  long_title: "Велес (Пушкинский район) (4-ая суббота месяца)"
-  short_title: "Велес"
-  address: "Московская область городской округ Пушкинский село Рахманово"
-  link: "https://walkthedog.ru/veles"
-  donate_link: "https://www.tinkoff.ru/sl/72xLdsZQp6"
-  guide: ""
-  people_limit: 30
-  schedule:
-    type: "regularly"
-    details: [4, 6]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-9:
-  id: 9
-  title: "\"Мокрый нос\" (Зеленоград)"
-  long_title: "\"Мокрый нос\" (Зеленоград) (4-ое воскресенье месяца)"
-  short_title: "Мокрый"
-  address: "северо-запад Москвы в в Солнечногорском района (недалеко от приюта Ника)"
-  link: "https://walkthedog.ru/wetnose"
-  donate_link: "https://www.tinkoff.ru/sl/A3izVb5Cyzn"
-  guide: "https://docs.google.com/document/d/1KpHXsjfyDC_9tiPBzc_56o5c7vYQJwCeMi-F5qxX_BM/edit"
-  people_limit: 30
-  schedule:
-    type: "regularly"
-    details: [4, 7]
-    dates_exceptions: []
-    time_start: "11:00"
-    time_end: "13:00"
-10:
-  id: 10
-  title: "\"Лемур\" (Воскресенск)"
-  long_title: "\"Лемур\" (Воскресенск)"
-  short_title: "Лемур"
-  address: "г. Воскресенск на юго-востоке от Москвы (80 км от МКАД по Новорязанское шоссе)"
-  link: "https://walkthedog.ru/lemur"
-  donate_link: "https://www.tinkoff.ru/sl/24qy6x8P4MP"
-  guide: ""
-  people_limit: 0
-  schedule:
-    type: "everyday"
-    details: []
-    dates_exceptions: []
-    time_start: "10:00"
-    time_end: "19:00"
+shelters:
+  - id: 1
+    title: "Хаски Хелп (Истра)"
+    long_title: "Хаски Хелп (Истра) (1-ая суббота и 2-ое воскресенье месяца)"
+    short_title: "Хаски"
+    address: "Московская область, городской округ Истра, деревня Карцево"
+    link: "https://walkthedog.ru/huskyhelp"
+    donate_link: "https://www.tinkoff.ru/sl/1msxKU5XTyS"
+    guide: "https://docs.google.com/document/d/1ywdrkhIetPEK3-pBFwysDFBslxQ7QBzsb9b95hxEh_k/"
+    people_limit: 50
+    schedule:
+      type: "regularly"
+      details: [[1, 6], [2, 7]]
+      dates_exceptions: []
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 2
+    title: "Дубовая роща (Москва)"
+    long_title: "Дубовая роща (Москва) (1-ая суббота месяца)"
+    short_title: "Дубовая"
+    address: "г. Москва, м. Телецентр"
+    link: "https://walkthedog.ru/dubovaya"
+    donate_link: "https://www.tinkoff.ru/cf/72xLdsZQp6"
+    guide: ""
+    people_limit: 30
+    schedule:
+      type: "regularly"
+      details: [[1, 6]]
+      dates_exceptions: []
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 3
+    title: '"Ника" (Зеленоград)'
+    long_title: '"Ника" (Зеленоград) (2-ая суббота месяца)'
+    short_title: "Ника"
+    address: "г. Зеленоград"
+    link: "https://walkthedog.ru/nika"
+    donate_link: "https://www.tinkoff.ru/sl/A3izVb5Cyzn"
+    guide: "https://docs.google.com/document/d/1w9bOj_fuELO246nvHqwW8rb9qJ2I61R6lKQactHC8JQ/edit?usp=sharing"
+    people_limit: 30
+    schedule:
+      type: "regularly"
+      details: [[2, 6]]
+      dates_exceptions: []
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 4
+    title: '"Шанс" (Щелково)'
+    long_title: '"Шанс" (Save Husky, Щелково) (2-ое воскресенье месяца)'
+    short_title: "Шанс"
+    address: "Московская область, Щелково"
+    link: "https://walkthedog.ru/savehusky"
+    donate_link: "https://www.tinkoff.ru/cf/5OrkCaUBo5D"
+    guide: ""
+    people_limit: 20
+    schedule:
+      type: "none"
+      #details: [[2, 7]]
+      #dates_exceptions: []
+      #time_start: "11:00"
+      #time_end: "13:00"
+  - id: 5
+    title: '"Домашний" (Балашиха)'
+    long_title: '"Домашний" (Балашиха) (3-ья суббота и 1-ое воскресенье месяца)'
+    short_title: "ДомашнийБ"
+    address: "Московская область, Балашиха"
+    link: "https://walkthedog.ru/domashniy_balashikha"
+    donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"
+    guide: "https://docs.google.com/document/d/13ERK_jKTfoJvHZxIb8MQjleZWZVsbNmmoVUMYh-gPeA/edit"
+    people_limit: 30
+    schedule:
+      type: "regularly"
+      details: [[3, 6], [1, 7]]
+      dates_exceptions: []
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 6
+    title: "Биозона (Воскресенск)"
+    long_title: "Биозона (Воскресенск) (1-ая и 3-ья суббота месяца)"
+    short_title: "Биозона"
+    address: "пгт Белоозерский, Воскресенский район Московской области"
+    link: "https://walkthedog.ru/biozona"
+    donate_link: "https://www.tinkoff.ru/sl/AG2GLNF5aun"
+    guide: "https://docs.google.com/document/d/1exL74Apb3mrQFOl4r4zYEiE1W4wNJpbXTPTqPpWE8TI/edit"
+    people_limit: 25
+    schedule:
+      type: "regularly"
+      details: [[3, 6], [1, 6]]
+      dates_exceptions: []
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 7
+    title: '"Домашний" (м. Аннино)'
+    long_title: '"Домашний" (м. Аннино) (4-ая суббота месяца)'
+    short_title: "ДомашнийА"
+    address: ""
+    link: "https://walkthedog.ru/domashniy_annino"
+    donate_link: "https://www.tinkoff.ru/cf/72pWBoJ9qYL"
+    guide: "https://docs.google.com/document/d/1GtKQAg21rUzDzG_1i9bDrZ6I67v9qgV_noQCIk8b8cc/edit"
+    people_limit: 30
+    schedule:
+      type: "regularly"
+      details: [[4, 6]]
+      dates_exceptions: ["23.07.2022", "24.09.2022", "26.11.2022"]
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 8
+    title: "Велес (Пушкинский район)"
+    long_title: "Велес (Пушкинский район) (4-ая суббота месяца)"
+    short_title: "Велес"
+    address: "Московская область городской округ Пушкинский село Рахманово"
+    link: "https://walkthedog.ru/veles"
+    donate_link: "https://www.tinkoff.ru/sl/72xLdsZQp6"
+    guide: ""
+    people_limit: 30
+    schedule:
+      type: "regularly"
+      details: [[4, 6]]
+      dates_exceptions: []
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 9
+    title: '"Мокрый нос" (Зеленоград)'
+    long_title: '"Мокрый нос" (Зеленоград) (4-ое воскресенье месяца)'
+    short_title: "Мокрый"
+    address: "северо-запад Москвы в в Солнечногорском района (недалеко от приюта Ника)"
+    link: "https://walkthedog.ru/wetnose"
+    donate_link: "https://www.tinkoff.ru/sl/A3izVb5Cyzn"
+    guide: "https://docs.google.com/document/d/1KpHXsjfyDC_9tiPBzc_56o5c7vYQJwCeMi-F5qxX_BM/edit"
+    people_limit: 30
+    schedule:
+      type: "regularly"
+      details: [[4, 7]]
+      dates_exceptions: []
+      time_start: "11:00"
+      time_end: "13:00"
+  - id: 10
+    title: '"Лемур" (Воскресенск)'
+    long_title: '"Лемур" (Воскресенск)'
+    short_title: "Лемур"
+    address: "г. Воскресенск на юго-востоке от Москвы (80 км от МКАД по Новорязанское шоссе)"
+    link: "https://walkthedog.ru/lemur"
+    donate_link: "https://www.tinkoff.ru/sl/24qy6x8P4MP"
+    guide: ""
+    people_limit: 0
+    schedule:
+      type: "everyday"
+      details: [[]]
+      dates_exceptions: []
+      time_start: "10:00"
+      time_end: "19:00"
