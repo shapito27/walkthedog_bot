@@ -186,7 +186,7 @@ func getTripsToSheltersList() []*models.TripToShelter {
 			PeopleLimit: 4,
 			Schedule: models.ShelterSchedule{
 				Type:            "sdfsdf",
-				Details:         []int{4, 54},
+				Details:         [][]int{{4, 54}, {1, 7}},
 				DatesExceptions: []string{"434", "sdf"},
 				TimeStart:       "1:1",
 				TimeEnd:         "34:5",
@@ -213,7 +213,7 @@ func getTripsToSheltersList() []*models.TripToShelter {
 			PeopleLimit: 4,
 			Schedule: models.ShelterSchedule{
 				Type:            "sdfsdf",
-				Details:         []int{4, 54},
+				Details:         [][]int{{4, 54}, {1, 7}},
 				DatesExceptions: []string{"434", "sdf"},
 				TimeStart:       "1:1",
 				TimeEnd:         "34:5",

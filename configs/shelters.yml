@@ -31,7 +31,7 @@ shelters:
       time_end: "13:00"
   - id: 3
     title: '"Ника" (Зеленоград)'
-    long_title: '"Ника" (Зеленоград) (2-ая суббота месяца)'
+    long_title: '"Ника" (Зеленоград) (2-ая суббота и 3-е воскресенье месяца)'
     short_title: "Ника"
     address: "г. Зеленоград"
     link: "https://walkthedog.ru/nika"
@@ -40,7 +40,7 @@ shelters:
     people_limit: 30
     schedule:
       type: "regularly"
-      details: [[2, 6]]
+      details: [[2, 6], [3, 7]]
       dates_exceptions: []
       time_start: "11:00"
       time_end: "13:00"
@@ -91,7 +91,7 @@ shelters:
       time_end: "13:00"
   - id: 7
     title: '"Домашний" (м. Аннино)'
-    long_title: '"Домашний" (м. Аннино) (4-ая суббота месяца)'
+    long_title: '"Домашний" (м. Аннино) (2-ая и 4-ая суббота месяца)'
     short_title: "ДомашнийА"
     address: ""
     link: "https://walkthedog.ru/domashniy_annino"
@@ -100,13 +100,13 @@ shelters:
     people_limit: 30
     schedule:
       type: "regularly"
-      details: [[4, 6]]
+      details: [[2, 6], [4, 6]]
       dates_exceptions: ["23.07.2022", "24.09.2022", "26.11.2022"]
       time_start: "11:00"
       time_end: "13:00"
   - id: 8
     title: "Велес (Пушкинский район)"
-    long_title: "Велес (Пушкинский район) (4-ая суббота месяца)"
+    long_title: "Велес (Пушкинский район) (1-ое и 4-ое воскресенье месяца)"
     short_title: "Велес"
     address: "Московская область городской округ Пушкинский село Рахманово"
     link: "https://walkthedog.ru/veles"
@@ -115,7 +115,7 @@ shelters:
     people_limit: 30
     schedule:
       type: "regularly"
-      details: [[4, 6]]
+      details: [[1, 7], [4, 7]]
       dates_exceptions: []
       time_start: "11:00"
       time_end: "13:00"
