@@ -412,16 +412,16 @@ func main() {
 						app.Bot.Send(msgObj)
 						break
 					}
-/* 					// check if no trips dates
-					if !isShelterHasTripDates(shelter) {
-						message := `Прию`
-												msgObj := tgbotapi.NewMessage(chatId, message)
-						
-												msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
-												msgObj.ParseMode = tgbotapi.ModeHTML
-												app.Bot.Send(msgObj)
-												break
-					} */
+					/* 					// check if no trips dates
+					   					if !isShelterHasTripDates(shelter) {
+					   						message := `Прию`
+					   												msgObj := tgbotapi.NewMessage(chatId, message)
+
+					   												msgObj.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
+					   												msgObj.ParseMode = tgbotapi.ModeHTML
+					   												app.Bot.Send(msgObj)
+					   												break
+					   					} */
 
 					log.Println("[walkthedog_bot]: Send whichDate question")
 					msgObj = whichDate(chatId, shelter)
@@ -1015,14 +1015,13 @@ func getDatesByShelter(shelter *models.Shelter) []string {
 
 // getDatesByMonth return list of dates by month for all shelters.
 func getDatesByMonth(monthIndex int, shelters *SheltersList) []string {
-	// shedules stores shelters shedule where key is date + shelter id. It needs for temprorary store dates to sort them later.
-	var shedules = make(map[int]string)
+	// shedules stores shelters shedule where key is date. It needs for temporary store dates to sort them later.
+	var shedules = make(map[int][]string)
 	// sortedKeys we need for sorting shedules by keys.
 	var sortedKeys []int
 	now := time.Now()
 
 	for _, shelter := range *shelters {
-
 		if shelter.Schedule.Type == "regularly" {
 			var trips = shelter.Schedule.Details
 			for _, tripDate := range trips {
@@ -1047,28 +1046,33 @@ func getDatesByMonth(monthIndex int, shelters *SheltersList) []string {
 				if isException {
 					continue
 				}
-				// index is date + shelter id. ID needs for prevent case when several trips for same date.
-				index, err := strconv.Atoi(day.Format("20060102") + shelter.ID)
+
+				// Use only date for sorting
+				index, err := strconv.Atoi(day.Format("20060102"))
 				if err != nil {
 					log.Println("Can't convert date to int")
 					continue
 				}
-				sortedKeys = append(sortedKeys, index)
-				shedules[index] = dates.WeekDaysRu[day.Weekday()] + " " + formatedDate + " " + scheduleTime + ", " + shelter.Title
+
+				// Store all trips for the same date in a slice
+				dateStr := dates.WeekDaysRu[day.Weekday()] + " " + formatedDate + " " + scheduleTime + ", " + shelter.Title
+				shedules[index] = append(shedules[index], dateStr)
+
+				// Only add index once per date
+				if len(shedules[index]) == 1 {
+					sortedKeys = append(sortedKeys, index)
+				}
 			}
-		} else if shelter.Schedule.Type == "everyday" {
-			//TODO: finish everyday type
-		} else if shelter.Schedule.Type == "none" {
-			// do nothing
 		}
 	}
-	// sorting dates.
+
+	// Remove duplicate keys and sort
 	sort.Ints(sortedKeys)
 
 	var shedule []string
-	// build final slice of shedule sorted by date.
-	for _, value := range sortedKeys {
-		shedule = append(shedule, shedules[value])
+	// Build final slice of schedule sorted by date, including all trips for each date
+	for _, key := range sortedKeys {
+		shedule = append(shedule, shedules[key]...)
 	}
 
 	return shedule
