@@ -14,6 +14,7 @@ import (
 
 	"walkthedog/internal/dates"
 	sheet "walkthedog/internal/google/sheet"
+	"walkthedog/internal/interfaces"
 	"walkthedog/internal/models"
 
 	"github.com/davecgh/go-spew/spew"
@@ -23,11 +24,12 @@ import (
 )
 
 type AppConfig struct {
-	Environment string
-	AdminChatId int64
-	Google      *models.Google
-	Cache       *cache.Cache
-	Bot         *tgbotapi.BotAPI
+	Environment   string
+	AdminChatId   int64
+	Google        *models.Google
+	Cache         *cache.Cache
+	Bot           interfaces.TelegramBot
+	SheetsService interfaces.GoogleSheetsService
 }
 
 // Environments
@@ -137,7 +139,7 @@ var statePool = make(map[int64]*models.State)
 var statePoolMutex sync.RWMutex
 
 // TODO: remove poll_id after answer.
-// polls stores poll_id => chat_id with mutex protection  
+// polls stores poll_id => chat_id with mutex protection
 var polls = make(map[string]int64)
 var pollsMutex sync.RWMutex
 
@@ -160,7 +162,7 @@ func main() {
 		log.Panic(err)
 	}
 	app.Cache = c
-	
+
 	// Start cleanup goroutine to prevent memory leaks
 	go startCleanupWorker()
 	/* trip := models.TripToShelter{
@@ -212,16 +214,30 @@ func main() {
 	app.Google = config.Google
 
 	// bot init
-	app.Bot, err = tgbotapi.NewBotAPI(telegramConfig.APIToken)
+	bot, err := tgbotapi.NewBotAPI(telegramConfig.APIToken)
 	if err != nil {
 		log.Panic(err)
 	}
 
 	if app.Environment == developmentEnv {
-		app.Bot.Debug = true
+		bot.Debug = true
 	}
 
-	log.Printf("Authorized on account %s", app.Bot.Self.UserName)
+	app.Bot = bot
+
+	// Initialize Google Sheets service
+	app.SheetsService, err = sheet.NewGoogleSpreadsheet(*app.Google)
+	if err != nil {
+		log.Printf("Unable to initialize Google Sheets service: %v", err)
+		// Continue without sheets service for now
+	}
+
+	user, err := app.Bot.GetMe()
+	if err != nil {
+		log.Printf("Unable to get bot info: %v", err)
+	} else {
+		log.Printf("Authorized on account %s", user.UserName)
+	}
 
 	// set how often check for updates
 	u := tgbotapi.NewUpdate(0)
@@ -576,9 +592,9 @@ func main() {
 				// if user dont set username
 				if update.PollAnswer.User.UserName == "" {
 					pollsMutex.RLock()
-				chatIdFromPoll := polls[update.PollAnswer.PollID]
-				pollsMutex.RUnlock()
-				lastMessage = app.askForContactCommand(chatIdFromPoll)
+					chatIdFromPoll := polls[update.PollAnswer.PollID]
+					pollsMutex.RUnlock()
+					lastMessage = app.askForContactCommand(chatIdFromPoll)
 					break
 				}
 
@@ -1299,34 +1315,34 @@ func initCache() (*cache.Cache, error) {
 func startCleanupWorker() {
 	ticker := time.NewTicker(30 * time.Minute) // Run every 30 minutes
 	defer ticker.Stop()
-	
+
 	for range ticker.C {
 		cleanupOldStates()
 		cleanupOldPolls()
 	}
 }
 
-// cleanupOldStates removes chat states older than 1 hour
+// cleanupOldStates removes abandoned chat states
 func cleanupOldStates() {
 	statePoolMutex.Lock()
 	defer statePoolMutex.Unlock()
-	
-	cutoff := time.Now().Add(-1 * time.Hour)
+
+	removedCount := 0
 	for chatId, state := range statePool {
-		// Remove states that haven't been updated in over 1 hour
-		// This is a simple heuristic - could be improved with last access tracking
-		if len(state.LastMessage) == 0 || time.Since(time.Now()) > time.Hour {
+		// Remove states with empty LastMessage (abandoned sessions)
+		if len(state.LastMessage) == 0 {
 			delete(statePool, chatId)
+			removedCount++
 		}
 	}
-	log.Printf("Cleaned up old states, current count: %d", len(statePool))
+	log.Printf("Cleaned up %d abandoned states, current count: %d", removedCount, len(statePool))
 }
 
 // cleanupOldPolls removes poll mappings older than 24 hours
 func cleanupOldPolls() {
 	pollsMutex.Lock()
 	defer pollsMutex.Unlock()
-	
+
 	// Simple cleanup - remove all polls periodically
 	// In production, you'd want to track poll creation time
 	pollCount := len(polls)
@@ -1491,10 +1507,22 @@ func (app *AppConfig) sendCachedTripsToGSheet() {
 // sendTripToGSheet.
 func (app *AppConfig) sendTripToGSheet(chatId int64, newTripToShelter *models.TripToShelter) bool {
 	savingError := false
-	googleSpreadsheet, err := sheet.NewGoogleSpreadsheet(*app.Google)
-	if err != nil {
+
+	if app.SheetsService == nil {
 		savingError = true
-		log.Printf("Unable to get sheet.NewGoogleSpreadsheet: %v", err)
+		log.Printf("Sheets service not initialized")
+	}
+
+	if newTripToShelter == nil {
+		savingError = true
+		log.Printf("Trip to shelter is nil")
+		return false
+	}
+
+	if newTripToShelter.Shelter == nil {
+		savingError = true
+		log.Printf("Trip shelter is nil")
+		return false
 	}
 	/*
 		@INFO this code allows to save data to separate tab with
@@ -1518,7 +1546,7 @@ func (app *AppConfig) sendTripToGSheet(chatId int64, newTripToShelter *models.Tr
 	sheetName := newTripToShelter.Shelter.ShortTitle
 
 	if !savingError {
-		resp, err := googleSpreadsheet.SaveTripToShelter(sheetName, newTripToShelter)
+		resp, err := app.SheetsService.SaveTripToShelter(sheetName, newTripToShelter)
 
 		if err != nil {
 			savingError = true
@@ -1530,7 +1558,7 @@ func (app *AppConfig) sendTripToGSheet(chatId int64, newTripToShelter *models.Tr
 
 		sheetName := "System"
 		// save to system table
-		resp, err = googleSpreadsheet.SaveTripToShelterSystem(sheetName, newTripToShelter)
+		resp, err = app.SheetsService.SaveTripToShelterSystem(sheetName, newTripToShelter)
 
 		if err != nil {
 			savingError = true

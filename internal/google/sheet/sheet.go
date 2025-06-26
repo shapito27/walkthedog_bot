@@ -18,6 +18,7 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"
 
+	"walkthedog/internal/interfaces"
 	"walkthedog/internal/models"
 )
 
@@ -26,7 +27,7 @@ type googleSheet struct {
 	Service       *sheets.Service
 }
 
-func NewGoogleSpreadsheet(google models.Google) (*googleSheet, error) {
+func NewGoogleSpreadsheet(google models.Google) (interfaces.GoogleSheetsService, error) {
 	//save to google sheet
 	srv, err := NewService()
 	if err != nil {
@@ -231,7 +232,7 @@ func (googleSheetService googleSheet) CreateSheet(sheetName string) (*sheets.Bat
 	return googleSheetService.Service.Spreadsheets.BatchUpdate(googleSheetService.SpreadsheetID, rbb).Context(context.Background()).Do()
 }
 
-//AddSheetHeaders adds headers for new sheet.
+// AddSheetHeaders adds headers for new sheet.
 func (googleSheetService googleSheet) AddSheetHeaders(sheetName string) (*sheets.AppendValuesResponse, error) {
 	//User	Приют	Дата	Первый раз	Цели	Как добирается	Откуда узнал	Дата регистрации на выезд (UTC +8)	Статус
 	var vr sheets.ValueRange
