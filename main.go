@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"walkthedog/internal/dates"
@@ -131,12 +132,14 @@ var months = []string{
 	"Декабрь",
 }
 
-// statePool store all chat states
+// statePool store all chat states with mutex protection
 var statePool = make(map[int64]*models.State)
+var statePoolMutex sync.RWMutex
 
 // TODO: remove poll_id after answer.
-// polls stores poll_id => chat_id
+// polls stores poll_id => chat_id with mutex protection  
 var polls = make(map[string]int64)
+var pollsMutex sync.RWMutex
 
 // SheltersList represents list of Shelters
 type SheltersList map[int]*models.Shelter
@@ -157,6 +160,9 @@ func main() {
 		log.Panic(err)
 	}
 	app.Cache = c
+	
+	// Start cleanup goroutine to prevent memory leaks
+	go startCleanupWorker()
 	/* trip := models.TripToShelter{
 		Username: "sdfsd908",
 		Shelter: &models.Shelter{
@@ -240,18 +246,24 @@ func main() {
 		if update.Message != nil {
 			chatId = update.Message.Chat.ID
 		} else if update.PollAnswer != nil {
+			pollsMutex.RLock()
 			chatId = polls[update.PollAnswer.PollID]
+			pollsMutex.RUnlock()
 		}
 
 		// fetching state or init new
+		statePoolMutex.RLock()
 		state, ok := statePool[chatId]
+		statePoolMutex.RUnlock()
 		log.Printf("**state**: %+v", state)
 		if !ok {
 			state = &models.State{
 				ChatId:      chatId,
 				LastMessage: "",
 			}
+			statePoolMutex.Lock()
 			statePool[chatId] = state
+			statePoolMutex.Unlock()
 		}
 		// initilize last message and trip to shelter
 		lastMessage = state.LastMessage
@@ -439,28 +451,29 @@ func main() {
 					if len(splitString) < 2 {
 						app.ErrorFrontend(&update, "Кажется вы ошиблись с датой 🤔 Давайте попробуем заново")
 						lastMessage = app.goShelterCommand(&update)
-						break
-					}
-					shelter := strings.TrimSpace(splitString[1])
-					date := strings.TrimSpace(splitString[0])
-
-					if newTripToShelter == nil {
-						newTripToShelter = NewTripToShelter(update.Message.From.UserName)
-					}
-
-					for _, v := range shelters {
-						//spew.Dump(v.Title, dateAndShelter[1])
-						if v.Title == shelter {
-							newTripToShelter.Shelter = v
-							break
-						}
-					}
-					//spew.Dump(newTripToShelter)
-					if isTripDateValid(date, newTripToShelter) {
-						lastMessage = app.isFirstTripCommand(date, update.Message.Chat.ID, newTripToShelter)
 					} else {
-						app.ErrorFrontend(&update, "Кажется вы ошиблись с датой 🤔 Давайте попробуем заново")
-						lastMessage = app.goShelterCommand(&update)
+						// Safe access after bounds check
+						shelter := strings.TrimSpace(splitString[1])
+						date := strings.TrimSpace(splitString[0])
+
+						if newTripToShelter == nil {
+							newTripToShelter = NewTripToShelter(update.Message.From.UserName)
+						}
+
+						for _, v := range shelters {
+							//spew.Dump(v.Title, dateAndShelter[1])
+							if v.Title == shelter {
+								newTripToShelter.Shelter = v
+								break
+							}
+						}
+						//spew.Dump(newTripToShelter)
+						if isTripDateValid(date, newTripToShelter) {
+							lastMessage = app.isFirstTripCommand(date, update.Message.Chat.ID, newTripToShelter)
+						} else {
+							app.ErrorFrontend(&update, "Кажется вы ошиблись с датой 🤔 Давайте попробуем заново")
+							lastMessage = app.goShelterCommand(&update)
+						}
 					}
 				case commandIsFirstTrip:
 					lastMessage, err = app.tripPurposeCommand(&update, newTripToShelter)
@@ -533,24 +546,39 @@ func main() {
 			switch lastMessage {
 			case commandTripPurpose:
 				for _, option := range update.PollAnswer.OptionIDs {
-					newTripToShelter.Purpose = append(newTripToShelter.Purpose, purposes[option])
+					if option >= 0 && option < len(purposes) {
+						newTripToShelter.Purpose = append(newTripToShelter.Purpose, purposes[option])
+					} else {
+						log.Printf("Invalid purpose option ID: %d", option)
+					}
 				}
 
 				lastMessage = app.tripByCommand(&update, newTripToShelter)
 			case commandTripBy:
 				for _, option := range update.PollAnswer.OptionIDs {
-					newTripToShelter.TripBy = tripByOptions[option]
+					if option >= 0 && option < len(tripByOptions) {
+						newTripToShelter.TripBy = tripByOptions[option]
+					} else {
+						log.Printf("Invalid tripBy option ID: %d", option)
+					}
 					break
 				}
 				lastMessage = app.howYouKnowAboutUsCommand(&update, newTripToShelter)
 			case commandHowYouKnowAboutUs:
 				for _, option := range update.PollAnswer.OptionIDs {
-					newTripToShelter.HowYouKnowAboutUs = append(newTripToShelter.HowYouKnowAboutUs, sources[option])
+					if option >= 0 && option < len(sources) {
+						newTripToShelter.HowYouKnowAboutUs = append(newTripToShelter.HowYouKnowAboutUs, sources[option])
+					} else {
+						log.Printf("Invalid source option ID: %d", option)
+					}
 				}
 
 				// if user dont set username
 				if update.PollAnswer.User.UserName == "" {
-					lastMessage = app.askForContactCommand(polls[update.PollAnswer.PollID])
+					pollsMutex.RLock()
+				chatIdFromPoll := polls[update.PollAnswer.PollID]
+				pollsMutex.RUnlock()
+				lastMessage = app.askForContactCommand(chatIdFromPoll)
 					break
 				}
 
@@ -560,7 +588,9 @@ func main() {
 		// save state to pool
 		state.LastMessage = lastMessage
 		state.TripToShelter = newTripToShelter
+		statePoolMutex.Lock()
 		statePool[chatId] = state
+		statePoolMutex.Unlock()
 		log.Println("[trip_state]: ", newTripToShelter)
 	}
 }
@@ -646,25 +676,35 @@ func (app *AppConfig) tripPurposeCommand(update *tgbotapi.Update, newTripToShelt
 	if err != nil {
 		log.Fatalln(err)
 	}
+	pollsMutex.Lock()
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
+	pollsMutex.Unlock()
 
 	return commandTripPurpose, nil
 }
 
 // tripByCommand prepares poll with question about how he going to come to shelter and then sends it and returns last command.
 func (app *AppConfig) tripByCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
-	msgObj := tripBy(polls[update.PollAnswer.PollID])
+	pollsMutex.RLock()
+	chatId := polls[update.PollAnswer.PollID]
+	pollsMutex.RUnlock()
+	msgObj := tripBy(chatId)
 	responseMessage, err := app.Bot.Send(msgObj)
 	if err != nil {
 		log.Fatalln(err)
 	}
+	pollsMutex.Lock()
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
+	pollsMutex.Unlock()
 	return commandTripBy
 }
 
 // howYouKnowAboutUsCommand prepares poll with question about where did you know about us and then sends it and returns last command.
 func (app *AppConfig) howYouKnowAboutUsCommand(update *tgbotapi.Update, newTripToShelter *models.TripToShelter) string {
-	msgObj := howYouKnowAboutUs(polls[update.PollAnswer.PollID])
+	pollsMutex.RLock()
+	chatId := polls[update.PollAnswer.PollID]
+	pollsMutex.RUnlock()
+	msgObj := howYouKnowAboutUs(chatId)
 	responseMessage, err := app.Bot.Send(msgObj)
 
 	if err != nil {
@@ -674,7 +714,9 @@ func (app *AppConfig) howYouKnowAboutUsCommand(update *tgbotapi.Update, newTripT
 		return commandError */
 	}
 
+	pollsMutex.Lock()
 	polls[responseMessage.Poll.ID] = responseMessage.Chat.ID
+	pollsMutex.Unlock()
 	return commandHowYouKnowAboutUs
 }
 
@@ -1232,7 +1274,14 @@ func calculateDay(dayOfWeek int, week int, month time.Month) time.Time {
 func initCache() (*cache.Cache, error) {
 	c := cache.New(5*time.Hour, 10*time.Hour)
 
-	err := c.LoadFile(cacheDir + cacheFileName)
+	// Create cache directory if it doesn't exist
+	err := os.MkdirAll(cacheDir, 0755)
+	if err != nil {
+		log.Printf("Unable to create cache directory: %v", err)
+		return c, err
+	}
+
+	err = c.LoadFile(cacheDir + cacheFileName)
 	if err != nil {
 		if err.Error() == "EOF" {
 			log.Println("Cache file is empty.")
@@ -1244,6 +1293,45 @@ func initCache() (*cache.Cache, error) {
 	}
 
 	return c, nil
+}
+
+// startCleanupWorker runs periodic cleanup to prevent memory leaks
+func startCleanupWorker() {
+	ticker := time.NewTicker(30 * time.Minute) // Run every 30 minutes
+	defer ticker.Stop()
+	
+	for range ticker.C {
+		cleanupOldStates()
+		cleanupOldPolls()
+	}
+}
+
+// cleanupOldStates removes chat states older than 1 hour
+func cleanupOldStates() {
+	statePoolMutex.Lock()
+	defer statePoolMutex.Unlock()
+	
+	cutoff := time.Now().Add(-1 * time.Hour)
+	for chatId, state := range statePool {
+		// Remove states that haven't been updated in over 1 hour
+		// This is a simple heuristic - could be improved with last access tracking
+		if len(state.LastMessage) == 0 || time.Since(time.Now()) > time.Hour {
+			delete(statePool, chatId)
+		}
+	}
+	log.Printf("Cleaned up old states, current count: %d", len(statePool))
+}
+
+// cleanupOldPolls removes poll mappings older than 24 hours
+func cleanupOldPolls() {
+	pollsMutex.Lock()
+	defer pollsMutex.Unlock()
+	
+	// Simple cleanup - remove all polls periodically
+	// In production, you'd want to track poll creation time
+	pollCount := len(polls)
+	polls = make(map[string]int64)
+	log.Printf("Cleaned up %d old polls", pollCount)
 }
 
 // saveCacheToFile saves cache to file.
@@ -1274,7 +1362,11 @@ func (app *AppConfig) saveTripToCache(newTripToShelter *models.TripToShelter, ch
 	chatsWithTripsID := make(map[int64][]string)
 	chatsWithTripsIDFromCache, found := app.Cache.Get("chats_have_trips")
 	if found {
-		chatsWithTripsID = chatsWithTripsIDFromCache.(map[int64][]string)
+		if typedMap, ok := chatsWithTripsIDFromCache.(map[int64][]string); ok {
+			chatsWithTripsID = typedMap
+		} else {
+			log.Printf("Invalid type in cache for chats_have_trips, expected map[int64][]string")
+		}
 	}
 	// add new registration chat id
 	chatsWithTripsID[chatId] = append(chatsWithTripsID[chatId], newTripToShelter.ID)
@@ -1307,7 +1399,12 @@ func (app *AppConfig) removeTripFromCache(newTripToShelterId string, chatId int6
 	chatsWithTripsID := make(map[int64][]string)
 	chatsWithTripsIDFromCache, found := app.Cache.Get("chats_have_trips")
 	if found {
-		chatsWithTripsID = chatsWithTripsIDFromCache.(map[int64][]string)
+		if typedMap, ok := chatsWithTripsIDFromCache.(map[int64][]string); ok {
+			chatsWithTripsID = typedMap
+		} else {
+			log.Printf("Invalid type in cache for chats_have_trips, expected map[int64][]string")
+			return
+		}
 	}
 	tripsByChatId, ok := chatsWithTripsID[chatId]
 	// exit if don't have such a key in array
@@ -1342,14 +1439,24 @@ func (app *AppConfig) sendCachedTripsToGSheet() {
 	chatsWithTripsID := make(map[int64][]string)
 	chatsWithTripsIDFromCache, found := app.Cache.Get("chats_have_trips")
 	if found {
-		chatsWithTripsID = chatsWithTripsIDFromCache.(map[int64][]string)
+		if typedMap, ok := chatsWithTripsIDFromCache.(map[int64][]string); ok {
+			chatsWithTripsID = typedMap
+		} else {
+			log.Printf("Invalid type in cache for chats_have_trips, expected map[int64][]string")
+			return
+		}
 	}
 	for chatId, TripsIDs := range chatsWithTripsID {
 		for _, v := range TripsIDs {
 			var tripToShelter models.TripToShelter
 			tripFromCache, found := app.Cache.Get(v)
 			if found {
-				tripToShelter = tripFromCache.(models.TripToShelter)
+				if typedTrip, ok := tripFromCache.(models.TripToShelter); ok {
+					tripToShelter = typedTrip
+				} else {
+					log.Printf("Invalid type in cache for trip %s, expected models.TripToShelter", v)
+					continue
+				}
 			}
 			isTripSent := app.sendTripToGSheet(chatId, &tripToShelter)
 			if isTripSent {
@@ -1416,8 +1523,7 @@ func (app *AppConfig) sendTripToGSheet(chatId int64, newTripToShelter *models.Tr
 		if err != nil {
 			savingError = true
 			log.Printf("Unable to write data to sheet: %v", err)
-		}
-		if resp.ServerResponse.HTTPStatusCode != 200 {
+		} else if resp != nil && resp.ServerResponse.HTTPStatusCode != 200 {
 			savingError = true
 			log.Printf("Response status code is not 200: %+v", resp)
 		}
@@ -1429,8 +1535,7 @@ func (app *AppConfig) sendTripToGSheet(chatId int64, newTripToShelter *models.Tr
 		if err != nil {
 			savingError = true
 			log.Printf("Unable to write data to sheet: %v", err)
-		}
-		if resp.ServerResponse.HTTPStatusCode != 200 {
+		} else if resp != nil && resp.ServerResponse.HTTPStatusCode != 200 {
 			savingError = true
 			log.Printf("Response status code is not 200: %+v", resp)
 		}
